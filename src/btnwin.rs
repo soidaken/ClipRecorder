@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
-use windows::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
+use windows::Win32::UI::Input::KeyboardAndMouse::{SetCapture, ReleaseCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 pub const BTN_OK: usize = 1;
@@ -26,6 +26,7 @@ pub enum Kind {
 }
 
 pub struct BtnWnd {
+    pub drag_offset: Option<POINT>,
     pub parent: HWND,
     pub kind: Kind,
     pub buttons: Vec<(usize, String)>,
@@ -136,6 +137,7 @@ fn create_btnwnd(
         );
         let is_indicator = matches!(kind, Kind::Indicator);
         let data = Box::new(BtnWnd {
+            drag_offset: None,
             parent,
             kind,
             buttons,
@@ -278,6 +280,23 @@ unsafe extern "system" fn btn_wndproc(
         WM_MOUSEMOVE => {
             let px = (lparam.0 & 0xffff) as i16 as i32;
             let py = ((lparam.0 >> 16) & 0xffff) as i16 as i32;
+            // dragging?
+            if let Some(off) = data.drag_offset {
+                let mut rc = RECT::default();
+                let _ = GetWindowRect(hwnd, &mut rc);
+                let nx = rc.left + px - off.x;
+                let ny = rc.top + py - off.y;
+                let _ = SetWindowPos(
+                    hwnd,
+                    Some(HWND_TOPMOST),
+                    nx,
+                    ny,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOACTIVATE,
+                );
+                return LRESULT(0);
+            }
             let (btns, _, _, _) = layout(hwnd, data);
             let mut newhover = 0usize;
             for (rc, id) in &btns {
@@ -298,6 +317,15 @@ unsafe extern "system" fn btn_wndproc(
             let _ = TrackMouseEvent(&mut tme);
             LRESULT(0)
         }
+        WM_LBUTTONUP => {
+            data.drag_offset = None;
+            let _ = ReleaseCapture();
+            LRESULT(0)
+        }
+        WM_CAPTURECHANGED => {
+            data.drag_offset = None;
+            LRESULT(0)
+        }
         WM_MOUSELEAVE => {
             if data.hover != 0 {
                 data.hover = 0;
@@ -309,8 +337,10 @@ unsafe extern "system" fn btn_wndproc(
             let px = (lparam.0 & 0xffff) as i16 as i32;
             let py = ((lparam.0 >> 16) & 0xffff) as i16 as i32;
             let (btns, _, _, _) = layout(hwnd, data);
+            let mut on_button = false;
             for (rc, id) in &btns {
                 if px >= rc.left && px < rc.right && py >= rc.top && py < rc.bottom {
+                    on_button = true;
                     let _ = PostMessageW(
                         Some(data.parent),
                         app::WM_BTN_CLICK,
@@ -318,6 +348,11 @@ unsafe extern "system" fn btn_wndproc(
                         LPARAM(hwnd.0 as isize),
                     );
                 }
+            }
+            if !on_button {
+                // start manual drag of the whole bar
+                data.drag_offset = Some(POINT { x: px, y: py });
+                let _ = SetCapture(hwnd);
             }
             LRESULT(0)
         }

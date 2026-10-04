@@ -269,12 +269,13 @@ unsafe extern "system" fn main_wndproc(
             LRESULT(0)
         }
         WM_REC_DONE => {
+            let failed = wparam.0 == 1;
             let path_ptr = lparam.0 as *mut String;
             let text = if path_ptr.is_null() {
-                String::from("录屏已保存")
+                String::from(if failed { "录屏失败" } else { "录屏已保存" })
             } else {
                 let s = Box::from_raw(path_ptr);
-                format!("录屏已保存: {}", s)
+                format!("{}", s)
             };
             APP.with(|a| {
                 let mut a = a.borrow_mut();

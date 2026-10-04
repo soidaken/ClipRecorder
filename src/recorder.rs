@@ -19,14 +19,21 @@ pub fn start(rect: RECT, done_hwnd: HWND) -> Arc<AtomicBool> {
     let done_addr = done_hwnd.0 as isize;
     std::thread::spawn(move || unsafe {
         let done_hwnd = HWND(done_addr as *mut core::ffi::c_void);
-        if record_thread(rect, done_hwnd, stop2).is_err() {
-            if !done_hwnd.is_invalid() {
-                let _ = PostMessageW(
-                    Some(done_hwnd),
-                    app::WM_REC_DONE,
-                    WPARAM(0),
-                    LPARAM(0),
-                );
+        match record_thread(rect, done_hwnd, stop2) {
+            Ok(()) => {}
+            Err(e) => {
+                let msg = Box::new(format!("录屏失败: {e}"));
+                let ptr = Box::into_raw(msg);
+                if !done_hwnd.is_invalid() {
+                    let _ = PostMessageW(
+                        Some(done_hwnd),
+                        app::WM_REC_DONE,
+                        WPARAM(1),
+                        LPARAM(ptr as isize),
+                    );
+                } else {
+                    drop(unsafe { Box::from_raw(ptr) });
+                }
             }
         }
     });
@@ -122,7 +129,10 @@ unsafe fn record_thread(rect: RECT, done_hwnd: HWND, stop: Arc<AtomicBool>) -> R
         }
         next_frame += 1;
 
-        BitBlt(mdc, 0, 0, w, h, Some(sdc), rect.left, rect.top, SRCCOPY | CAPTUREBLT)?;
+        if BitBlt(mdc, 0, 0, w, h, Some(sdc), rect.left, rect.top, SRCCOPY | CAPTUREBLT).is_err() {
+            // transient GDI failure (e.g. secure desktop): skip this frame
+            continue;
+        }
         let _ = GdiFlush();
 
         // write sample
