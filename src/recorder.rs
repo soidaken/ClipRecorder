@@ -32,7 +32,7 @@ pub fn start(rect: RECT, done_hwnd: HWND) -> Arc<AtomicBool> {
                         LPARAM(ptr as isize),
                     );
                 } else {
-                    drop(unsafe { Box::from_raw(ptr) });
+                    drop(Box::from_raw(ptr));
                 }
             }
         }
