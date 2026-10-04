@@ -64,7 +64,7 @@ pub fn set_overlay(hwnd: Option<HWND>) {
 pub fn start_recording(rect: RECT) {
     // rect is in global physical coords
     let main = main_hwnd();
-    let indicator = btnwin::create_indicator(main);
+    let indicator = btnwin::create_indicator(main, &rect);
     let stop = recorder::start(rect, main);
     APP.with(|a| {
         a.borrow_mut().recording = Some(Rec { stop, indicator });

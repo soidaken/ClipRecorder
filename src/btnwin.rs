@@ -42,7 +42,7 @@ pub fn create_confirm(parent: HWND, sel: &RECT, virt: &RECT) -> HWND {
     ];
     // place at bottom-right inside selection, flip above if near bottom
     let pad = 8;
-    let (ww, wh) = layout_size(&buttons, true);
+    let (ww, wh) = layout_size(&buttons, None);
     let bx = (sel.right + virt.left - ww - pad).max(virt.left + pad);
     let by = sel.bottom + virt.top + pad;
     let by = if by + wh > virt.bottom - pad {
@@ -54,24 +54,39 @@ pub fn create_confirm(parent: HWND, sel: &RECT, virt: &RECT) -> HWND {
     create_btnwnd(parent, bx, by, ww, wh, Kind::Confirm, buttons, String::new())
 }
 
-pub fn create_indicator(parent: HWND) -> HWND {
-    // place near top-left of primary screen
-    let mut pt = POINT::default();
-    unsafe {
-        let _ = GetCursorPos(&mut pt);
-    }
+pub fn create_indicator(parent: HWND, sel_global: &RECT) -> HWND {
     let buttons = vec![(BTN_STOP, String::from("\u{25a0} 停止"))];
-    let (ww, wh) = layout_size(&buttons, true);
-    let bx = (pt.x - ww / 2).max(8);
-    let by = (pt.y - 80).max(8);
-    create_btnwnd(parent, bx, by, ww, wh, Kind::Indicator, buttons, String::from("00:00"))
+    let label = String::from("00:00");
+    let (ww, wh) = layout_size(&buttons, Some(&label));
+    // centered above the recorded region, clamped to the virtual desktop (multi-monitor safe)
+    let vx = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+    let vy = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+    let vw = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };
+    let vh = unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) };
+    let cx = (sel_global.left + sel_global.right) / 2;
+    let bx = (cx - ww / 2).clamp(vx + 8, vx + vw - ww - 8);
+    let mut by = sel_global.top - wh - 14;
+    if by < vy + 8 {
+        by = (sel_global.bottom + 14).min(vy + vh - wh - 8);
+    }
+    create_btnwnd(parent, bx, by, ww, wh, Kind::Indicator, buttons, label)
 }
 
-fn layout_size(buttons: &[(usize, String)], _with_label: bool) -> (i32, i32) {
-    let bh = 36;
-    let mut w = 12;
+/// rough text width in px for 15px Segoe UI
+fn text_w(s: &str) -> i32 {
+    s.chars().map(|c| if (c as u32) >= 0x2E80 { 15 } else { 9 }).sum()
+}
+
+fn layout_size(buttons: &[(usize, String)], label: Option<&str>) -> (i32, i32) {
+    let bh = 38;
+    let mut w = 14; // left pad
+    if let Some(l) = label {
+        w += 14 + 10 + text_w(l) + 14; // dot + gap + time
+    } else {
+        w += 4;
+    }
     for (_, label) in buttons {
-        w += label.chars().count() as i32 * 9 + 16 + 24;
+        w += text_w(label) + 26 + 10; // button + gap
     }
     (w + 4, bh + 16)
 }
@@ -167,19 +182,17 @@ unsafe fn layout(hwnd: HWND, data: &BtnWnd) -> (Vec<(RECT, usize)>, RECT, i32, i
     let bh = 36;
     let mut btns = Vec::new();
     // right aligned
-    let mut x = ww - 8;
+    let mut x = ww - 10;
     for (id, label) in data.buttons.iter().rev() {
-        let mut wide: Vec<u16> = label.encode_utf16().collect();
-        let bw = (wide.len() as i32 * 9).max(40) + 24;
+        let bw = text_w(label) + 26;
         x -= bw;
         btns.push((
             RECT { left: x, top: (wh - bh) / 2, right: x + bw, bottom: (wh - bh) / 2 + bh },
             *id,
         ));
-        x -= 8;
-        let _ = &mut wide;
+        x -= 10;
     }
-    let label_rc = RECT { left: 14, top: 0, right: x, bottom: wh };
+    let label_rc = RECT { left: 28, top: 0, right: x, bottom: wh };
     (btns, label_rc, ww, wh)
 }
 
@@ -220,13 +233,13 @@ unsafe extern "system" fn btn_wndproc(
                     // red dot
                     let dot = CreateSolidBrush(COLORREF(0x3030FF));
                     let od = SelectObject(hdc, HGDIOBJ(dot.0));
-                    let _ = Ellipse(hdc, 14, wh / 2 - 6, 26, wh / 2 + 6);
+                    let _ = Ellipse(hdc, 16, wh / 2 - 7, 30, wh / 2 + 7);
                     SelectObject(hdc, od);
                     let _ = DeleteObject(HGDIOBJ(dot.0));
                     SetBkMode(hdc, TRANSPARENT);
                     SetTextColor(hdc, COLORREF(0xFFFFFF));
                     let mut wide: Vec<u16> = data.label.encode_utf16().collect();
-                    let mut trc = RECT { left: 34, top: 0, right: 34 + 60, bottom: wh };
+                    let mut trc = RECT { left: 38, top: 0, right: 38 + text_w(&data.label) + 6, bottom: wh };
                     let _ = DrawTextW(hdc, &mut wide, &mut trc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                     SelectObject(hdc, oldfont);
                 }
@@ -237,6 +250,8 @@ unsafe extern "system" fn btn_wndproc(
                     let is_ok = *id == BTN_OK;
                     let color = if is_ok {
                         ACCENT
+                    } else if matches!(data.kind, Kind::Indicator) {
+                        0x2F2FE8 // stop button: red accent (COLORREF BGR)
                     } else if hovered {
                         BTN_HOVER
                     } else {
