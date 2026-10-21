@@ -1,0 +1,73 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        shell: pwsh
+        run: |
+          $unformatted = @(gofmt -l .)
+          if ($unformatted.Count -gt 0) {
+            Write-Error "gofmt needed: $unformatted"
+            exit 1
+          }
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build portable exe
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_type == 'tag' && github.ref_name || '1.1.0' }}".TrimStart('v')
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: ./build-installer.ps1 -Version '${{ steps.version.outputs.version }}'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClipRecorder-${{ steps.version.outputs.version }}-windows-x64
+          path: |
+            dist/ClipRecorder.exe
+            dist/ClipRecorder-Setup.exe
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ClipRecorder.exe
+            dist/ClipRecorder-Setup.exe
+          generate_release_notes: true
