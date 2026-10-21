@@ -98,3 +98,7 @@ go test ./internal/recording -run TestAudioAndFrameRateIntegration -count=1 -v
 - 目前不录制鼠标指针，不支持录制中切换声音设备；设备拔出或失效时会停止并提示。
 - DRM 受保护内容可能为黑屏；GDI 捕获性能取决于选区大小和系统负载。
 - 选区不含标注、OCR、窗口自动吸附及拖动边缘调整功能。
+
+## 许可证
+
+[MIT](LICENSE)
