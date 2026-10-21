@@ -1,103 +1,69 @@
 # ClipRecorder
 
-基于 [MyGo](https://github.com/egoist/mygo) 的 Windows 原生截图 / 录屏工具。常驻系统托盘，Go 编写，使用 MyGo 原生 UI，无 WebView、HTML 或 JavaScript。
+**简体中文** · [English](README.en.md) · [日本語](README.ja.md)
 
-| 操作 | 功能 |
+Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go 编写，界面由 [MyGo](https://github.com/egoist/mygo) 直接绘制（GPU 原生 UI），没有 WebView、HTML 或 JavaScript，也不依赖 FFmpeg。
+
+## 能做什么
+
+- **截图**：框选任意区域，复制到剪贴板。
+- **录屏**：框选区域录制为 H.264 / MP4，可同时录系统声音和麦克风，支持分辨率比例、帧率、画质与硬件编码选项。
+- **框选翻译**：框选英文区域，松开后由本机 OCR 识别、DeepSeek 翻译，并在原位置用白底中文覆盖显示，尽量保留原有排版和文字颜色。
+
+## 基本操作
+
+| 快捷键 | 功能 |
 | --- | --- |
-| `Ctrl+I` | 拖动框选 → 点击「复制截图」或按 Enter → 图片复制到剪贴板 |
-| `Ctrl+R` | 拖动框选 → 点击「开始录制」→ 录制选区为 MP4；录制中再次按下不停止 |
-| `Ctrl+T` | 框选英文区域，松开后自动识别、翻译并在原选区覆盖显示中文 |
-| `Ctrl+Shift+T` / 点击悬浮条「停止」 | 停止录制，完成文件保存后自动打开存放目录 |
+| `Ctrl+I` | 框选截图 → 点击「复制截图」或按 `Enter` |
+| `Ctrl+R` | 框选录屏 → 设置参数 → 点击「开始录制」或按 `Enter` |
+| `Ctrl+T` | 框选英文区域 → 松开即识别并翻译覆盖 |
+| `Ctrl+Shift+T` / 悬浮条「停止」 | 停止录制并保存 |
 | `Esc` / 右键 | 取消框选 |
-| 托盘菜单 | 截图、录屏、停止、开机启动（勾选开关）、退出 |
 
-按 `Ctrl+R` 后，录屏设置出现在框选界面：
+托盘图标右键可执行同样的操作，并控制开机启动。
 
-- **系统声音**：默认勾选，录制 Windows 默认播放设备的声音。
-- **麦克风**：默认不勾选，开启后录制 Windows 默认输入设备；与系统声音可同时开启，也可全部关闭。
-- **帧率**：可选 30 / 60fps，默认 60fps。每次触发录屏恢复这些默认值。
-- **画质**：标准 / 高清 / 极清，默认高清。框选后显示实际编码分辨率与目标视频码率；悬浮条也显示当前画质。画面按选区物理像素采集，不缩放。
-- **比例**：9:16 / 16:9 / 3:4 / 4:3 / 1:1，默认全部不选（自由框选）。比例互斥，再次点击已选比例可取消；按当前宽高选择改动较小的一边，调整后保持在屏幕内，物理宽高保持偶数并精确匹配比例。重画选区后仍应用所选比例，编码检测随尺寸更新。
-- **编码**：自动 / 硬件 / 软件，默认自动。框选区域后，根据所选分辨率、帧率、画质和声音设置进行后台试编码；修改这些参数会重新检测，连续调整合并为一次检测，旧结果不会覆盖新参数。检测后更新硬件选项的可用状态；原先选择硬件而新参数不支持时，自动切换为软件。自动模式优先使用当前参数可用的硬件编码，手动选择软件会保留。检测完成后可开始录制，悬浮条显示实际编码方式。试编码使用临时空白帧，不采集屏幕或麦克风，不在录制目录留下文件。
+录屏文件：`%USERPROFILE%\Videos\ClipRecorder\`。
 
-以 1920×1080 为例，三个档位在 60fps 下的目标视频码率约为 12.4 / 24.9 / 43.5 Mbps，30fps 为一半。实际码率随画面复杂度变化。所有档位使用 H.264 High；更高画质会增加文件大小和编码负担。建议按原始尺寸播放检查文字边缘：将 718×338 之类的小选区放大到全屏，无法获得 1080p 的细节。
+翻译首次使用需填入 DeepSeek API Key，之后用 Windows DPAPI 加密保存在本机（`%APPDATA%\ClipRecorder\deepseek-key.dat`），截图不会上传。
 
-设置完成、框选区域后，点击「开始录制」或按 Enter。录制期间悬浮条显示所选帧率和声音来源。
+## 技术栈
 
-选区显示物理像素尺寸，支持重新拖动框选。底部提示说明框选后需确认开始。录制悬浮条默认出现在录制区域所在屏幕的右下角，避开任务栏，支持系统原生拖动，显示录制时间及保存状态。退出时会等待正在录制的 MP4 完成保存。
+| 环节 | 实现 |
+| --- | --- |
+| 语言 / UI | Go + MyGo v0.5.5：原生窗口、GPU 玻璃面板、托盘、全局快捷键、剪贴板 |
+| 屏幕捕获 | Win32 GDI `BitBlt`（Go 直接调用，复用录制帧缓冲） |
+| 视频编码 | Windows Media Foundation，H.264 / MP4，自动检测并使用硬件编码器（如 NVENC），不可用时回退软件 |
+| 音频 | [go-wca](https://github.com/moutend/go-wca) 的 WASAPI 绑定，系统回环 + 麦克风，混音后 AAC 48kHz |
+| 文字识别 | Windows 自带 OCR（本机运行，不上传图片） |
+| 翻译 | DeepSeek Chat API，仅发送识别出的文本 |
 
-界面采用统一的深色玻璃工具面板：框选工具栏使用 MyGo 的 GPU 玻璃材质，录制悬浮条使用 Windows Acrylic（不支持时使用实色背景）。中文优先使用微软雅黑 UI，计时数字使用 Segoe UI 等宽数字特性；字体由 DirectWrite 按系统设置平滑渲染。
+## 下载
 
-截图、录屏和翻译的选区窗口直接覆盖整个桌面，关闭该窗口的 DWM 显示过渡动画，不修改系统全局动画设置。
+到 [Releases](https://github.com/soidaken/ClipRecorder/releases) 下载：
 
-## 框选翻译
+- `ClipRecorder.exe`：免安装版，双击运行。
+- `ClipRecorder-Setup.exe`：安装版，安装到 `%LOCALAPPDATA%\Programs\ClipRecorder`，默认开机启动，可在托盘里取消。
 
-首次按 `Ctrl+T` 暂停并显示 DeepSeek API Key 输入界面，确认后自动继续框选；之后直接进入框选。也可在托盘“设置 DeepSeek Key…”中替换密钥。密钥使用当前用户的 Windows DPAPI 加密，保存在 `%APPDATA%\ClipRecorder\deepseek-key.dat`，不写入日志或安装包。
+系统要求：Windows 10 / 11，64 位；OCR 翻译需要系统已安装对应语言包。
 
-框选松开后立即启动本机 Windows OCR，只将识别出的英文文字行发送到 DeepSeek 官方接口（`deepseek-flash`），截图不上传。非英文行保留。结果在原选区内以白底、系统默认字体绘制，沿用各行位置，按空间换行或缩小字号；从原图估计文字颜色，无法可靠识别或颜色过浅时使用黑色。`Esc` 或右键关闭覆盖层，重新按 `Ctrl+T` 可框选其他内容。翻译过程没有确认按钮。
+## 从源码构建
 
-翻译系统指令与原文 JSON 数据分开提交，要求只翻译、不执行原文中的指令；响应校验行号和数量，只绘制文本，不执行返回内容。复杂多栏、艺术字体和旋转文本无法保证原样排版。OCR 使用系统 PowerShell 5.1 和 Windows OCR，无额外 OCR 安装依赖；系统需有可用的 OCR 语言包，优先英文，不可用时使用用户已安装的语言。
-
-文件保存在 `%USERPROFILE%\Videos\ClipRecorder\rec_YYYYMMDD_HHMMSS.mmm.mp4`。
-
-## 运行与构建
-
-`dist/ClipRecorder-Setup.exe` 是简体中文安装版，安装到当前用户的 `%LOCALAPPDATA%\Programs\ClipRecorder`，提供桌面和开始菜单快捷方式及卸载入口。首次安装默认开机启动；右键系统托盘图标可勾选或取消“开机启动”，覆盖安装保留此选择，卸载时移除启动项。开机启动仅对当前 Windows 用户生效。
-
-`dist/ClipRecorder.exe` 仍为免安装版，双击运行不会主动注册开机启动，可通过同一托盘开关启用。启用后需保留该 exe 原路径。
-
-Windows 10 / 11，64 位；Go 1.27.1+。支持 Go 自动获取工具链，无需 C 编译器。
+需要 Go 1.27+；安装版还需要 Inno Setup 6 编译器（或用 `ISCC` 环境变量指定路径）。
 
 ```powershell
 go run .
-.\build.ps1
-# 生成安装版（需要 Inno Setup 6 编译器；可用 ISCC 环境变量指定路径）
-.\build-installer.ps1
+.\build.ps1            # dist/ClipRecorder.exe
+.\build-installer.ps1  # dist/ClipRecorder-Setup.exe
 ```
 
-双击 `dist/ClipRecorder.exe` 后从系统托盘或快捷键操作。若快捷键被其他程序占用，会提示失败，仍可使用托盘菜单。
-
-`build.ps1` 会先停止本项目目录中正在运行的 ClipRecorder 程序，再构建并覆盖 `dist/ClipRecorder.exe`。
-
-## 实现
-
-- 窗口、GPU 原生 UI、托盘、快捷键、通知和图片剪贴板：[MyGo v0.5.5](https://github.com/egoist/mygo/tree/v0.5.5)。
-- 屏幕捕获：GDI `BitBlt`，Go 直接调用 Win32，复用录制帧缓冲。
-- 视频编码：系统 Media Foundation，H.264 / MP4，目标 30 / 60fps，无 FFmpeg 运行依赖；实际采集速度受区域大小和设备性能影响。
-- 声音采集：[go-wca](https://github.com/moutend/go-wca) 的 WASAPI 绑定，独立采集系统回环和麦克风，由 Windows 转换为 48kHz 双声道 PCM，混音后编码 AAC 写入同一 MP4。
-- 音频以设备 QPC 时间戳对齐视频起点，按连续设备帧位置拼接，避免逐包取整产生空隙或重叠；真实丢帧和静音间隙保留时间。双路混音各衰减 6dB，避免两路大音量直接相加削波；单路保持原音量。AAC 为 48kHz / 192kbps。
-- 音频缓冲有容量限制。设备不可用或录制中断时会提示错误，不会悄悄忽略已选声音来源。
-- 时间戳使用实际经过时间，编码跟不上时保持录制时长；停止时使用 Finalize 排空编码器。
-- 录屏宽高向下对齐为偶数，最多裁掉右侧和底部各 1 像素。
-- `main_windows.go`：应用生命周期、托盘和录制状态；`selection_windows.go`：选区交互；`internal/capture`：截图；`internal/recording`：MP4 编码。
-- 原 Rust 实现保存在 `legacy/rust/`，供对照，不参与 Go 构建。
-
-## 验证
-
-```powershell
-go test ./...
-go vet ./...
-
-# 在已登录的 Windows 桌面运行真实 GDI + H.264 编码测试
-$env:CLIPRECORDER_INTEGRATION = '1'
-go test ./... -count=1 -v
-
-# 打开真实选区窗口，2 秒后退出
-go run . --smoke
-go run . --smoke-record
-
-# 30 秒系统声音 + 麦克风持续录制测试
-$env:CLIPRECORDER_LONG_TEST = '1'
-go test ./internal/recording -run TestAudioAndFrameRateIntegration -count=1 -v
-```
-
-自动测试覆盖正反向框选、100% / 150% / 200% 坐标换算、声音开关与帧率交互、静音间隙与混音、无效区域、奇偶尺寸录屏和 MP4 封装完成。集成测试覆盖 30/60fps、无声、系统声音、麦克风和两路混音。混合 DPI 多屏的实际布局仍需在对应设备验证。
+`build.ps1` 会先停止本项目目录里正在运行的 ClipRecorder，再构建并覆盖 `dist/ClipRecorder.exe`。每次 push 和 `v*` tag 会由 GitHub Actions 构建 exe、安装包并发布 Release。
 
 ## 限制
 
-- 目前不录制鼠标指针，不支持录制中切换声音设备；设备拔出或失效时会停止并提示。
-- DRM 受保护内容可能为黑屏；GDI 捕获性能取决于选区大小和系统负载。
-- 选区不含标注、OCR、窗口自动吸附及拖动边缘调整功能。
+- 不录制鼠标指针；录制中不能切换声音设备。
+- 选区不支持标注、窗口自动吸附、拖动边缘调整。
+- DRM 保护内容可能录成黑屏。
+- 复杂多栏、艺术字体、旋转文字的翻译排版无法保证与原图一致。
 
 ## 许可证
 
