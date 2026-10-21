@@ -39,10 +39,9 @@ The first translation asks for a DeepSeek API key, which is then encrypted with 
 
 ## Download
 
-Grab a build from [Releases](https://github.com/soidaken/ClipRecorder/releases):
+Grab `ClipRecorder-Setup.exe` from [Releases](https://github.com/soidaken/ClipRecorder/releases): it installs to `%LOCALAPPDATA%\Programs\ClipRecorder` and enables start-at-login by default (toggle it from the tray).
 
-- `ClipRecorder.exe`: portable, just run it.
-- `ClipRecorder-Setup.exe`: installer for `%LOCALAPPDATA%\Programs\ClipRecorder`, enables start-at-login by default (toggle it from the tray).
+For a portable build, run `build.ps1` and launch `dist/ClipRecorder.exe`.
 
 Requires Windows 10 / 11, 64-bit. Translation needs the matching OCR language pack installed.
 
@@ -56,7 +55,7 @@ go run .
 .\build-installer.ps1  # dist/ClipRecorder-Setup.exe
 ```
 
-`build.ps1` stops any ClipRecorder running from this project directory before overwriting `dist/ClipRecorder.exe`. GitHub Actions builds the exe and installer on every push and publishes a release for `v*` tags.
+`build.ps1` stops any ClipRecorder running from this project directory before overwriting `dist/ClipRecorder.exe`. GitHub Actions builds the exe and installer on every push and publishes a release for `v*` tags; documentation-only changes (`*.md`, `LICENSE`, …) skip the build.
 
 ## Limitations
 

@@ -39,10 +39,9 @@ Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go
 
 ## 下载
 
-到 [Releases](https://github.com/soidaken/ClipRecorder/releases) 下载：
+到 [Releases](https://github.com/soidaken/ClipRecorder/releases) 下载 `ClipRecorder-Setup.exe`：安装到 `%LOCALAPPDATA%\Programs\ClipRecorder`，默认开机启动，可在托盘里取消。
 
-- `ClipRecorder.exe`：免安装版，双击运行。
-- `ClipRecorder-Setup.exe`：安装版，安装到 `%LOCALAPPDATA%\Programs\ClipRecorder`，默认开机启动，可在托盘里取消。
+需要免安装版时，自行构建 `dist/ClipRecorder.exe`，双击即可运行。
 
 系统要求：Windows 10 / 11，64 位；OCR 翻译需要系统已安装对应语言包。
 
@@ -56,7 +55,7 @@ go run .
 .\build-installer.ps1  # dist/ClipRecorder-Setup.exe
 ```
 
-`build.ps1` 会先停止本项目目录里正在运行的 ClipRecorder，再构建并覆盖 `dist/ClipRecorder.exe`。每次 push 和 `v*` tag 会由 GitHub Actions 构建 exe、安装包并发布 Release。
+`build.ps1` 会先停止本项目目录里正在运行的 ClipRecorder，再构建并覆盖 `dist/ClipRecorder.exe`。每次 push 和 `v*` tag 会由 GitHub Actions 构建 exe、安装包并发布 Release；仅改动文档（`*.md`、`LICENSE` 等）不会触发构建。
 
 ## 限制
 

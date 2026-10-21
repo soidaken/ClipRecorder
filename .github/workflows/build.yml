@@ -64,22 +64,20 @@ jobs:
 
       - name: Build installer
         shell: pwsh
+        # build-installer.ps1 runs build.ps1 itself, producing the portable exe
+        # that the installer packages.
         run: ./build-installer.ps1 -Version '${{ steps.version.outputs.version }}'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ClipRecorder-${{ steps.version.outputs.version }}-windows-x64
-          path: |
-            dist/ClipRecorder.exe
-            dist/ClipRecorder-Setup.exe
+          path: dist/ClipRecorder-Setup.exe
           if-no-files-found: error
 
       - name: Publish release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/ClipRecorder.exe
-            dist/ClipRecorder-Setup.exe
+          files: dist/ClipRecorder-Setup.exe
           generate_release_notes: true

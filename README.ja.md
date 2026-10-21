@@ -39,10 +39,9 @@ Windows ネイティブのスクリーンショット・画面録画・範囲翻
 
 ## ダウンロード
 
-[Releases](https://github.com/soidaken/ClipRecorder/releases) から取得できます。
+[Releases](https://github.com/soidaken/ClipRecorder/releases) から `ClipRecorder-Setup.exe` を取得してください。`%LOCALAPPDATA%\Programs\ClipRecorder` にインストールされ、既定でスタートアップに登録されます（トレイから解除可能）。
 
-- `ClipRecorder.exe`：インストール不要版。ダブルクリックで起動。
-- `ClipRecorder-Setup.exe`：インストーラー。`%LOCALAPPDATA%\Programs\ClipRecorder` にインストールされ、既定でスタートアップに登録されます（トレイから解除可能）。
+インストール不要版が必要な場合は `build.ps1` で `dist/ClipRecorder.exe` をビルドして実行してください。
 
 Windows 10 / 11（64 ビット）が必要です。翻訳には該当する OCR 言語パックのインストールが必要です。
 
@@ -56,7 +55,7 @@ go run .
 .\build-installer.ps1  # dist/ClipRecorder-Setup.exe
 ```
 
-`build.ps1` はこのプロジェクトの ClipRecorder が起動中なら先に終了してから、`dist/ClipRecorder.exe` を上書きします。GitHub Actions が push のたびに exe とインストーラーをビルドし、`v*` タグでは Release を公開します。
+`build.ps1` はこのプロジェクトの ClipRecorder が起動中なら先に終了してから、`dist/ClipRecorder.exe` を上書きします。GitHub Actions が push のたびに exe とインストーラーをビルドし、`v*` タグでは Release を公開します。ドキュメントのみの変更（`*.md`、`LICENSE` など）ではビルドを実行しません。
 
 ## 制限
 
