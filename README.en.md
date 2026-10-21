@@ -1,5 +1,7 @@
 # ClipRecorder
 
+[![build](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml/badge.svg)](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml)
+
 [简体中文](README.md) · **English** · [日本語](README.ja.md)
 
 A native Windows screenshot, screen recorder and region translator that lives in the system tray. Written in Go, the UI is drawn directly by [MyGo](https://github.com/egoist/mygo) (GPU-backed native UI) — no WebView, HTML or JavaScript, and no FFmpeg dependency.

@@ -1,5 +1,7 @@
 # ClipRecorder
 
+[![build](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml/badge.svg)](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml)
+
 [简体中文](README.md) · [English](README.en.md) · **日本語**
 
 Windows ネイティブのスクリーンショット・画面録画・範囲翻訳ツールです。常駐型で、Go で書かれ、UI は [MyGo](https://github.com/egoist/mygo) が直接描画します（GPU によるネイティブ UI）。WebView・HTML・JavaScript を使わず、FFmpeg にも依存しません。

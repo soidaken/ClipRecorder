@@ -1,5 +1,7 @@
 # ClipRecorder
 
+[![build](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml/badge.svg)](https://github.com/soidaken/ClipRecorder/actions/workflows/build.yml)
+
 **简体中文** · [English](README.en.md) · [日本語](README.ja.md)
 
 Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go 编写，界面由 [MyGo](https://github.com/egoist/mygo) 直接绘制（GPU 原生 UI），没有 WebView、HTML 或 JavaScript，也不依赖 FFmpeg。
