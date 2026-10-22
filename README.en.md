@@ -10,7 +10,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 
 - **Screenshot**: drag a region and copy it to the clipboard.
 - **Record**: record a region to H.264 / MP4, with system audio and microphone, aspect-ratio presets, frame rate, quality and hardware-encoder options.
-- **Region translate**: drag over English text; local OCR reads it, DeepSeek translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible.
+- **Region translate**: drag over English text; the screenshot itself is sent to the model, which reads and translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible.
 
 ## Basic usage
 
@@ -26,7 +26,11 @@ The tray menu offers the same actions and toggles start-at-login.
 
 Recordings are saved to `%USERPROFILE%\Videos\ClipRecorder\`.
 
-The first translation asks for a DeepSeek API key, which is then encrypted with Windows DPAPI and stored locally (`%APPDATA%\ClipRecorder\deepseek-key.dat`). Screenshots are never uploaded.
+The first translation asks for a DeepSeek API key, which is then encrypted with Windows DPAPI and stored locally (`%APPDATA%\ClipRecorder\deepseek-key.dat`). The selected screenshot is sent to DeepSeek as JPEG for recognition and translation.
+
+Every selection saves two images to the Downloads folder: `translate_<time>.jpg` is the crop sent to the model, and `translate_<time>_zh.png` is the rendered Chinese result.
+
+Original colors that are too light (for example white text on a dark background) are darkened until they are readable on white, keeping the hue where possible. Before upload the crop is scaled to the resolution the model works at (about 1.7 megapixels) to keep the request small; lines of one block share a font size, centered titles stay centered, and any line that still comes back in English is retranslated once in a small text-only request. Installing or upgrading closes a running ClipRecorder, letting an active recording finish saving first.
 
 ## Tech stack
 
@@ -36,7 +40,7 @@ The first translation asks for a DeepSeek API key, which is then encrypted with 
 | Capture | Win32 GDI `BitBlt` called directly from Go, sharing the recording frame buffer |
 | Video | Windows Media Foundation, H.264 / MP4, hardware encoder auto-detected (e.g. NVENC) with software fallback |
 | Audio | WASAPI via [go-wca](https://github.com/moutend/go-wca): system loopback + microphone mixed into AAC 48 kHz |
-| OCR | Windows built-in OCR, running locally (images are never uploaded) |
+| OCR | No local OCR: DeepSeek's vision model reads the screenshot directly |
 | Translation | DeepSeek Chat API, receiving only the recognized text |
 
 ## Download
@@ -45,7 +49,7 @@ Grab `ClipRecorder-Setup.exe` from [Releases](https://github.com/soidaken/ClipRe
 
 For a portable build, run `build.ps1` and launch `dist/ClipRecorder.exe`.
 
-Requires Windows 10 / 11, 64-bit. Translation needs the matching OCR language pack installed.
+Requires Windows 10 / 11, 64-bit.
 
 ## Build from source
 

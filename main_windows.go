@@ -42,7 +42,18 @@ func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
+	// The installer asks a running instance to quit this way: it is a tray app
+	// with no main window, so closing its windows would never end the process.
+	// Reaching this point means we own the lock, so there is nothing to quit.
+	if hasArg(os.Args[1:], "--quit") {
+		return
+	}
 	a := &app{}
+	mygo.App.OnSecondInstance(func(args []string, _ string) {
+		if hasArg(args, "--quit") {
+			mygo.App.Quit() // Finishes an active recording before quitting.
+		}
+	})
 	mygo.App.OnWindowAllClosed(func() {}) // Remain in the tray between captures.
 	mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
 		if a.job != nil {
@@ -247,4 +258,13 @@ func trayPNG() []byte {
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, img)
 	return buf.Bytes()
+}
+
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }

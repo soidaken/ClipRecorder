@@ -1,18 +1,25 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
+	"image/jpeg"
+	"image/png"
+	"log"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"cliprecorder/internal/capture"
 	"cliprecorder/internal/translation"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"golang.org/x/image/draw"
 )
 
 type keyDialog struct {
@@ -49,7 +56,7 @@ func (a *app) showKeyDialog(resume func()) {
 			toolTheme(c)
 			ui.Column(c).Fill().Padding(24).Gap(14).Background(ui.RGB(25, 31, 38)).Children(func() {
 				ui.Text(c, "输入 DeepSeek API Key").FontSize(18).FontWeight(600)
-				ui.Text(c, "密钥加密保存在本机。框选文字将发送给 DeepSeek 翻译。").FontSize(12).TextColor(muted)
+				ui.Text(c, "密钥加密保存在本机。框选内容以图片发送给 DeepSeek 识别并翻译。").FontSize(12).TextColor(muted)
 				input := ui.TextInput(c, &d.key).Password().Placeholder("DeepSeek API Key").AutoFocus().Height(38).FillWidth()
 				if d.message != "" {
 					ui.Text(c, d.message).FontSize(12).TextColor(ui.RGB(255, 160, 160))
@@ -89,7 +96,6 @@ type translationOverlay struct {
 	cancel context.CancelFunc
 	image  *image.RGBA
 	lines  []translation.Line
-	colors []color.RGBA
 	status string
 	scale  float64
 }
@@ -105,7 +111,6 @@ func (a *app) translateSelection(s *selection) {
 	if r.Empty() || a.selection != s {
 		return
 	}
-	// Normalize crop coordinates so OCR bounds and color samples share an origin.
 	img := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
 	for y := 0; y < r.Dy(); y++ {
 		copy(img.Pix[y*img.Stride:y*img.Stride+r.Dx()*4], s.snapshot.Pix[(r.Min.Y+y)*s.snapshot.Stride+r.Min.X*4:(r.Min.Y+y)*s.snapshot.Stride+r.Max.X*4])
@@ -119,7 +124,7 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	o := &translationOverlay{image: img, cancel: cancel, status: "正在识别文字…", scale: 1}
+	o := &translationOverlay{image: img, cancel: cancel, status: "正在识别并翻译…", scale: 1}
 	a.translation = o
 	o.window = mygo.NewWindow(mygo.WindowOptions{Title: "ClipRecorder · 翻译", Width: max(1, screenRect.Dx()), Height: max(1, screenRect.Dy()), Hidden: true, Frameless: true, Panel: true,
 		AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableShadow: true, BackgroundColor: "#ffffff", Content: ui.View(func(c *ui.Context) { o.view(c) })})
@@ -134,22 +139,29 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 	})
 	o.window.Show()
 	o.window.Focus()
+
+	// Keep both copies next to each other: the source crop and the rendered
+	// translation, told apart by the trailing marker.
+	base := filepath.Join(translationSaveDir(), "translate_"+time.Now().Format("20060102_150405"))
+	originalPath := base + ".jpg"
+	resultPath := base + "_zh.png"
+
 	go func() {
-		lines, err := translation.Recognize(ctx, img)
-		if err == nil && len(lines) == 0 {
-			err = fmt.Errorf("未识别到文字，请按 Esc 后重新框选")
-		}
+		// The model shrinks images to roughly this budget itself, so sending
+		// more pixels only makes the upload slower.
+		payload := modelImage(img)
+		jpegData, err := encodeJPEG(payload)
 		if err == nil {
-			mygo.RunOnMain(func() {
-				if a.translation == o {
-					o.status = "正在翻译…"
-					o.window.Invalidate()
-				}
-			})
+			// The crop is saved before the request so a failed translation still
+			// leaves the source image behind.
+			err = os.WriteFile(originalPath, jpegData, 0o644)
+		}
+		var lines []translation.Line
+		if err == nil {
 			var key string
 			key, err = translation.LoadKey()
 			if err == nil {
-				lines, err = (translation.Client{}).Translate(ctx, key, lines)
+				lines, err = (translation.Client{}).TranslateImage(ctx, key, jpegData)
 			}
 		}
 		mygo.RunOnMain(func() {
@@ -166,11 +178,27 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 			} else {
 				o.status = ""
 				o.lines = lines
-				for _, line := range lines {
-					o.colors = append(o.colors, sourceTextColor(img, line))
-				}
 			}
 			o.window.Invalidate()
+			if err != nil {
+				return
+			}
+			// Give the overlay a frame to paint, then store exactly what is shown.
+			go func() {
+				time.Sleep(450 * time.Millisecond)
+				mygo.RunOnMain(func() {
+					if a.translation != o {
+						return
+					}
+					shot, shotErr := capture.Snapshot(screenRect)
+					if shotErr == nil {
+						shotErr = writePNG(resultPath, shot)
+					}
+					if shotErr != nil {
+						log.Print("保存翻译结果失败: ", shotErr)
+					}
+				})
+			}()
 		})
 	}()
 }
@@ -185,71 +213,137 @@ func (o *translationOverlay) view(c *ui.Context) {
 		o.window.Close()
 		return
 	}
+	scale := float32(o.scale)
+	if scale <= 0 {
+		scale = 1
+	}
+	viewW := float32(o.image.Bounds().Dx()) / scale
+	viewH := float32(o.image.Bounds().Dy()) / scale
 	root.Children(func() {
 		if o.status != "" {
-			ui.Text(c, o.status).Font(ui.LightTheme().Font).FontSize(13).TextColor(ui.RGB(25, 25, 25)).Padding(8)
+			// Waiting text: centered in the selection, enlarged and slightly
+			// transparent so the page underneath still shows through.
+			size := min(max(float32(18), min(viewW, viewH)*0.09), 72)
+			ui.Column(c).Fill().Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, o.status).Font(ui.LightTheme().Font).FontSize(size).TextColor(ui.RGBA(0, 0, 0, 0.45)).TextAlign(ui.Center).Width(viewW * 0.88)
+			})
 			return
 		}
-		for i, line := range o.lines {
-			x, y := float32(line.X/o.scale), float32(line.Y/o.scale)
-			w := min(float32(line.W/o.scale)+4, float32(o.image.Bounds().Dx())/float32(o.scale)-x)
-			h := float32(o.image.Bounds().Dy())/float32(o.scale) - y
-			for _, next := range o.lines {
-				if next.Y > line.Y+line.H/2 && next.X < line.X+line.W && next.X+next.W > line.X {
-					h = min(h, float32((next.Y-line.Y)/o.scale)-1)
-				}
-			}
-			if w <= 0 || h <= 0 {
-				continue
-			}
-			size := max(float32(8), float32(line.H/o.scale))
-			for size > 8 {
-				layout := ui.ShapeText(line.Text, ui.Font{Family: ui.LightTheme().Font, Size: size}, w)
-				_, lh := layout.Size()
-				if lh <= h {
-					break
-				}
-				size -= 0.5
-			}
-			col := o.colors[i]
-			ui.Box(c).Absolute().Left(x).Top(y).Size(w, h).Clip().Children(func() {
-				ui.Text(c, line.Text).Font(ui.LightTheme().Font).FontSize(size).TextColor(ui.RGB(col.R, col.G, col.B)).Width(w)
-			})
-		}
+		o.renderLines(c, viewW, viewH)
 	})
 }
 
-func sourceTextColor(img *image.RGBA, line translation.Line) color.RGBA {
-	r := image.Rect(int(line.X), int(line.Y), int(math.Ceil(line.X+line.W)), int(math.Ceil(line.Y+line.H))).Intersect(img.Bounds())
-	hist := map[uint16]int{}
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		for x := r.Min.X; x < r.Max.X; x++ {
-			p := img.RGBAAt(x, y)
-			hist[uint16(p.R>>4)<<8|uint16(p.G>>4)<<4|uint16(p.B>>4)]++
+type lineBox struct{ x, y, w, h float32 }
+
+// renderLines lays the translated text into the boxes the model reported.
+// Lines of similar height share one font size, and a line that already sat in
+// the middle of the selection stays centered, so a translated block reads as a
+// block instead of a stack of independently sized rows.
+func (o *translationOverlay) renderLines(c *ui.Context, viewW, viewH float32) {
+	boxes := make([]lineBox, len(o.lines))
+	for i, line := range o.lines {
+		x := float32(line.X) * viewW
+		y := float32(line.Y) * viewH
+		boxes[i] = lineBox{x: x, y: y, w: min(float32(line.W)*viewW+4, viewW-x), h: min(float32(line.H)*viewH*1.35, viewH-y)}
+		for _, next := range o.lines {
+			if next.Y > line.Y+line.H/2 && next.X < line.X+line.W && next.X+next.W > line.X {
+				boxes[i].h = min(boxes[i].h, float32((next.Y-line.Y)*float64(viewH))-2)
+			}
 		}
 	}
-	var background uint16
-	count := 0
-	for k, n := range hist {
-		if n > count {
-			background, count = k, n
+	sizes := groupSizes(boxes)
+	for i, line := range o.lines {
+		b := boxes[i]
+		if b.w <= 0 || b.h <= 0 {
+			continue
+		}
+		centered := math.Abs(float64(b.x+b.w/2)-float64(viewW)/2) <= float64(viewW)*0.04
+		font := ui.Font{Family: ui.LightTheme().Font, Size: max(float32(8), sizes[i])}
+		size := font.Size
+		for size > 8 {
+			layout := ui.ShapeText(line.Text, ui.Font{Family: font.Family, Size: size}, b.w)
+			if _, lineHeight := layout.Size(); lineHeight <= b.h {
+				break
+			}
+			size -= 0.5
+		}
+		_, textHeight := ui.ShapeText(line.Text, ui.Font{Family: font.Family, Size: size}, b.w).Size()
+		top := b.y
+		if textHeight < b.h {
+			top = b.y + (b.h-textHeight)/2
+		}
+		col := translation.ContrastOnWhite(translation.ParseColor(line.Color))
+		align := ui.Start
+		if centered {
+			align = ui.Center
+		}
+		ui.Box(c).Absolute().Left(b.x).Top(top).Size(b.w, min(b.h, textHeight)+2).Clip().Children(func() {
+			ui.Text(c, line.Text).Font(font.Family).FontSize(size).TextColor(ui.RGB(col.R, col.G, col.B)).TextAlign(align).Width(b.w)
+		})
+	}
+}
+
+// groupSizes gives every run of similar-height lines the same starting size.
+func groupSizes(boxes []lineBox) []float32 {
+	sizes := make([]float32, len(boxes))
+	for i := range boxes {
+		if sizes[i] != 0 || boxes[i].h <= 0 {
+			continue
+		}
+		group := []int{i}
+		tallest := boxes[i].h
+		for j := i + 1; j < len(boxes); j++ {
+			if sizes[j] == 0 && boxes[j].h > 0 && math.Abs(float64(boxes[j].h-boxes[i].h)) <= float64(boxes[i].h)*0.15 {
+				group = append(group, j)
+				tallest = max(tallest, boxes[j].h)
+			}
+		}
+		for _, k := range group {
+			sizes[k] = tallest * 0.95
 		}
 	}
-	decode := func(k uint16) color.RGBA {
-		return color.RGBA{uint8((k>>8)&15) * 17, uint8((k>>4)&15) * 17, uint8(k&15) * 17, 255}
+	return sizes
+}
+
+// translationSaveDir is the Downloads folder, so both copies are easy to find.
+func translationSaveDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "."
 	}
-	bg := decode(background)
-	best := color.RGBA{0, 0, 0, 255}
-	count = 0
-	for k, n := range hist {
-		p := decode(k)
-		d := abs(float32(p.R)-float32(bg.R)) + abs(float32(p.G)-float32(bg.G)) + abs(float32(p.B)-float32(bg.B))
-		if d > 100 && n > count {
-			best, count = p, n
-		}
+	return filepath.Join(home, "Downloads")
+}
+
+// modelPixelBudget is roughly the pixel count the model keeps after its own
+// downscaling; sending more only slows the upload down.
+const modelPixelBudget = 1_700_000
+
+func modelImage(img *image.RGBA) *image.RGBA {
+	b := img.Bounds()
+	pixels := float64(b.Dx()) * float64(b.Dy())
+	if pixels <= modelPixelBudget {
+		return img
 	}
-	if count < 2 || (int(best.R)*299+int(best.G)*587+int(best.B)*114)/1000 > 210 {
-		return color.RGBA{0, 0, 0, 255}
+	scale := math.Sqrt(modelPixelBudget / pixels)
+	w := max(1, int(float64(b.Dx())*scale))
+	h := max(1, int(float64(b.Dy())*scale))
+	resized := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.CatmullRom.Scale(resized, resized.Bounds(), img, b, draw.Src, nil)
+	return resized
+}
+
+func encodeJPEG(img image.Image) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 82}); err != nil {
+		return nil, fmt.Errorf("无法生成截图副本：%w", err)
 	}
-	return best
+	return buf.Bytes(), nil
+}
+
+func writePNG(path string, img image.Image) error {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return fmt.Errorf("无法生成翻译图片：%w", err)
+	}
+	return os.WriteFile(path, buf.Bytes(), 0o644)
 }

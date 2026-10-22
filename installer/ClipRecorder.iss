@@ -20,8 +20,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\ClipRecorder.exe
-CloseApplications=yes
-CloseApplicationsFilter=ClipRecorder.exe
+CloseApplications=no
 RestartApplications=no
 SetupLogging=yes
 
@@ -51,4 +50,65 @@ begin
     Result := Enabled <> 0
   else
     Result := True;
+end;
+
+{ A tray app cannot be closed by closing its windows, so a running copy is
+  asked to quit through its own command line, which lets an active recording
+  finish saving. Versions without the switch are closed forcibly afterwards. }
+function ClipRecorderRunning: Boolean;
+var
+  ExitCode: Integer;
+  TaskFile: String;
+  Output: AnsiString;
+begin
+  TaskFile := ExpandConstant('{tmp}\cliprecorder-tasklist.txt');
+  DeleteFile(TaskFile);
+  Exec(ExpandConstant('{cmd}'), '/c tasklist /NH /FI "IMAGENAME eq ClipRecorder.exe" > "' + TaskFile + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+  Result := False;
+  if FileExists(TaskFile) then
+  begin
+    if LoadStringFromFile(TaskFile, Output) then
+      Result := Pos('ClipRecorder.exe', String(Output)) > 0;
+    DeleteFile(TaskFile);
+  end;
+  Log('ClipRecorder running: ' + IntToStr(Ord(Result)) + ' (tasklist exit ' + IntToStr(ExitCode) + ')');
+end;
+
+procedure CloseRunningClipRecorder;
+var
+  ExitCode, Attempt: Integer;
+  Exe: String;
+begin
+  Exe := ExpandConstant('{app}\ClipRecorder.exe');
+  if not FileExists(Exe) then
+    Exit;
+  if not ClipRecorderRunning then
+    Exit;
+  if not WizardSilent then
+    WizardForm.StatusLabel.Caption := '正在关闭正在运行的 ClipRecorder…';
+  Log('Asking ' + Exe + ' to quit');
+  Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+  for Attempt := 1 to 10 do
+  begin
+    Sleep(500);
+    if not ClipRecorderRunning then
+      Exit;
+  end;
+  Log('Forcing ClipRecorder to close');
+  Exec(ExpandConstant('{cmd}'), '/c taskkill /F /IM ClipRecorder.exe >nul 2>&1',
+    '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+  Sleep(500);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  CloseRunningClipRecorder;
+  Result := '';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    CloseRunningClipRecorder;
 end;

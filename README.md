@@ -10,7 +10,7 @@ Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go
 
 - **截图**：框选任意区域，复制到剪贴板。
 - **录屏**：框选区域录制为 H.264 / MP4，可同时录系统声音和麦克风，支持分辨率比例、帧率、画质与硬件编码选项。
-- **框选翻译**：框选英文区域，松开后由本机 OCR 识别、DeepSeek 翻译，并在原位置用白底中文覆盖显示，尽量保留原有排版和文字颜色。
+- **框选翻译**：框选英文区域，松开后把这张截图直接发给模型，识别文字并翻译成中文，然后在原位置用白底中文覆盖显示，尽量保留原有排版和文字颜色。
 
 ## 基本操作
 
@@ -26,7 +26,11 @@ Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go
 
 录屏文件：`%USERPROFILE%\Videos\ClipRecorder\`。
 
-翻译首次使用需填入 DeepSeek API Key，之后用 Windows DPAPI 加密保存在本机（`%APPDATA%\ClipRecorder\deepseek-key.dat`），截图不会上传。
+翻译首次使用需填入 DeepSeek API Key，之后用 Windows DPAPI 加密保存在本机（`%APPDATA%\ClipRecorder\deepseek-key.dat`）。框选的截图会以 JPEG 发送给 DeepSeek 识别与翻译。
+
+每次框选都会在下载目录保存两份图片：`translate_时间.jpg` 是发给模型的原始框选截图，`translate_时间_zh.png` 是渲染后的中文结果。
+
+原文字颜色过浅（例如深色背景上的白字）时会自动加深到白底上清晰可读的程度，仍尽量保留原来的色相。发送前截图会缩到模型自身处理的分辨率（约 170 万像素）以加快上传；同段文字使用统一字号、原本居中的标题保持居中；若返回的某行仍是英文，会自动补发一次纯文本请求重译。安装或覆盖安装会自动关闭正在运行的 ClipRecorder，正在录制的文件会先完成保存。
 
 ## 技术栈
 
@@ -36,7 +40,7 @@ Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go
 | 屏幕捕获 | Win32 GDI `BitBlt`（Go 直接调用，复用录制帧缓冲） |
 | 视频编码 | Windows Media Foundation，H.264 / MP4，自动检测并使用硬件编码器（如 NVENC），不可用时回退软件 |
 | 音频 | [go-wca](https://github.com/moutend/go-wca) 的 WASAPI 绑定，系统回环 + 麦克风，混音后 AAC 48kHz |
-| 文字识别 | Windows 自带 OCR（本机运行，不上传图片） |
+| 文字识别 | 由 DeepSeek 视觉模型直接从截图识别，不再本机 OCR |
 | 翻译 | DeepSeek Chat API，仅发送识别出的文本 |
 
 ## 下载
@@ -45,7 +49,7 @@ Windows 原生截图 / 录屏 / 框选翻译工具，常驻系统托盘。用 Go
 
 需要免安装版时，自行构建 `dist/ClipRecorder.exe`，双击即可运行。
 
-系统要求：Windows 10 / 11，64 位；OCR 翻译需要系统已安装对应语言包。
+系统要求：Windows 10 / 11，64 位。
 
 ## 从源码构建
 
