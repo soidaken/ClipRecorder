@@ -139,3 +139,23 @@ func recordingStopButton(c *ui.Context, enabled bool) ui.Element {
 	})
 	return b
 }
+
+// confirmButton is the primary action of the shot toolbar: WeChat green with
+// bold white text, so it stands out from the dark glass around it.
+func confirmButton(c *ui.Context, label string, enabled bool) ui.Element {
+	b := ui.ButtonBase(c).Height(36).Padding(0, 18).Gap(8).Radius(9).
+		Disabled(!enabled).Cursor(ui.CursorPointer)
+	fill, edge, color := ui.RGB(7, 193, 96), ui.RGBA(255, 255, 255, 0.28), ui.RGB(255, 255, 255)
+	if !enabled {
+		fill, edge, color = ui.RGBA(7, 193, 96, 0.35), ui.RGBA(255, 255, 255, 0.12), ui.RGBA(255, 255, 255, 0.6)
+	} else if b.Pressed() {
+		fill = ui.RGB(6, 168, 84)
+	} else if b.Hovered() {
+		fill = ui.RGB(20, 208, 110)
+	}
+	b.Background(fill).Border(1, edge).InsetShadow(0, 1, 0, 0, ui.RGBA(255, 255, 255, 0.2))
+	b.Children(func() {
+		ui.Text(c, label).FontWeight(800).FontSize(15).TextColor(color)
+	})
+	return b
+}

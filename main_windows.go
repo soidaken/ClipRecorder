@@ -26,6 +26,9 @@ type app struct {
 	quitting    bool
 	translation *translationOverlay
 	keyDialog   *keyDialog
+	// shotSaveFile writes every confirmed shot to disk and adds its path to
+	// the clipboard next to the image.
+	shotSaveFile bool
 }
 type recordJob struct {
 	cancel   context.CancelFunc
@@ -63,6 +66,7 @@ func main() {
 		}
 	})
 	mygo.App.WhenReady(func() {
+		a.shotSaveFile = true
 		startupItem := a.autostartMenuItem()
 		menu := mygo.NewMenu([]*mygo.MenuItem{
 			{Label: "截图  ·  Ctrl+I", Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
@@ -71,6 +75,7 @@ func main() {
 			{Label: "停止录制  ·  Ctrl+Shift+T", Click: func(*mygo.MenuItem, *mygo.Window) { a.stop() }},
 			mygo.Separator(),
 			startupItem,
+			saveShotItem(a),
 			{Label: "设置 DeepSeek Key…", Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
 			mygo.Separator(),
 			{Label: "退出", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
@@ -134,7 +139,7 @@ func (a *app) beginSelection(record, translate bool) {
 		a.notify("截图失败", err.Error())
 		return
 	}
-	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1}
+	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium}
 	a.selection = s
 	s.window = mygo.NewWindow(mygo.WindowOptions{
 		Title: "ClipRecorder · 选择区域", Content: ui.View(s.view), Hidden: true,
@@ -267,4 +272,15 @@ func hasArg(args []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// saveShotItem toggles writing a file copy (and its path on the clipboard)
+// for every confirmed shot.
+func saveShotItem(a *app) *mygo.MenuItem {
+	item := &mygo.MenuItem{Label: "截图同时保存文件并复制路径", Checked: a.shotSaveFile}
+	item.Click = func(*mygo.MenuItem, *mygo.Window) {
+		a.shotSaveFile = !a.shotSaveFile
+		item.SetChecked(a.shotSaveFile)
+	}
+	return item
 }

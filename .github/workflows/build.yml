@@ -56,7 +56,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_type == 'tag' && github.ref_name || '1.2.0' }}".TrimStart('v')
+          $version = "${{ github.ref_type == 'tag' && github.ref_name || '1.3.0' }}".TrimStart('v')
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Install Inno Setup

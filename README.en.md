@@ -16,13 +16,28 @@ A native Windows screenshot, screen recorder and region translator that lives in
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+I` | Select a region → click "Copy screenshot" or press `Enter` |
+| `Ctrl+I` | Select a region → click the green "确认" button or press `Enter` |
 | `Ctrl+R` | Select a region → set options → click "Start recording" or press `Enter` |
 | `Ctrl+T` | Select English text → release to recognize and translate in place |
 | `Ctrl+Shift+T` / "Stop" on the floating bar | Stop and save the recording |
 | `Esc` / right click | Cancel the selection |
 
 The tray menu offers the same actions and toggles start-at-login.
+
+## Annotating a shot
+
+After selecting a region the toolbar offers three annotation tools, all off by default; click one again to leave it:
+
+- **Pen**: draw freely inside the selection, 5 px crimson.
+- **Blur**: drag a rectangle inside the selection; on release that area is blurred (strength 75).
+- **Number**: click inside the selection to drop 1, 2, 3… in red circles (radius 12 px) with bold white digits.
+- **Region mark**: drag a 6 px red dashed rounded box inside the selection; any number of them.
+
+Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\` and puts the file and its absolute path on the clipboard alongside the image, so apps can take the bitmap, the file or the text. Turn it off with "截图同时保存文件并复制路径" in the tray menu.
+
+Annotations are included in the copied image. The bottom-left hint cancels with `Esc`. Once a region is chosen, clicking outside it does nothing; press `Esc` and select again to change it. Dragging from inside the region redraws it and clears the annotations.
+
+The 低 / 中 / 高 (low / medium / high) segments set the copied resolution: low caps the longest side at 1280 px, medium (default) and high copy at the screen's physical pixels, 1:1. The clipboard only carries lossless PNG, so medium and high are the sharpest possible.
 
 Recordings are saved to `%USERPROFILE%\Videos\ClipRecorder\`.
 

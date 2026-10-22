@@ -86,13 +86,13 @@ func TestTranslationSelectionHasNoConfirmButtons(t *testing.T) {
 	if !tt.HasText("拖动框选英文区域，松开后自动翻译 · Esc / 右键取消") {
 		t.Fatal("translation hint missing")
 	}
-	if tt.HasText("复制截图") || tt.HasText("开始录制") {
+	if tt.HasText("确认") || tt.HasText("开始录制") {
 		t.Fatal("translation must not show confirmation buttons")
 	}
 	tt.Press(30, 30)
 	tt.Move(320, 180)
 	tt.Release(320, 180)
-	if !s.selected || tt.HasText("复制截图") || tt.HasText("取消") {
+	if !s.selected || tt.HasText("确认") || tt.HasText("取消") {
 		t.Fatal("translation selection must not expose confirmation controls")
 	}
 }

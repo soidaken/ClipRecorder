@@ -25,13 +25,22 @@ func TestSelectionDragAndRedraw(t *testing.T) {
 		if got := s.physicalRect(); got != want {
 			t.Fatalf("physical region: got %v want %v", got, want)
 		}
-		if !tt.HasText("复制截图") {
+		if !tt.HasText("确认") {
 			t.Fatal("confirmation controls missing")
 		}
+		// A click outside the chosen region must not start over.
+		before := s.physicalRect()
 		tt.Press(450, 150)
 		tt.Move(300, 50)
 		tt.Release(300, 50)
-		if got := s.physicalRect(); got != image.Rect(int(300*scale), int(50*scale), int(450*scale), int(150*scale)) {
+		if got := s.physicalRect(); got != before {
+			t.Fatalf("outside click changed the region: %v", got)
+		}
+		// Dragging from inside still redraws the region.
+		tt.Press(200, 200)
+		tt.Move(300, 50)
+		tt.Release(300, 50)
+		if got := s.physicalRect(); got != image.Rect(int(200*scale), int(50*scale), int(300*scale), int(200*scale)) {
 			t.Fatalf("reverse redraw: %v", got)
 		}
 	}

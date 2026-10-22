@@ -39,7 +39,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Root: HKCU; Subkey: "Software\ClipRecorder"; ValueType: dword; ValueName: "AutoStart"; ValueData: "1"; Flags: createvalueifdoesntexist uninsdeletevalue uninsdeletekeyifempty
 
 [Run]
-Filename: "{app}\ClipRecorder.exe"; Description: "启动 ClipRecorder"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ClipRecorder.exe"; Description: "启动 ClipRecorder"; Flags: nowait postinstall
 
 [Code]
 function ShouldEnableAutoStart: Boolean;
