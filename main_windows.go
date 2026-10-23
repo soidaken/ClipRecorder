@@ -26,8 +26,8 @@ type app struct {
 	quitting    bool
 	translation *translationOverlay
 	keyDialog   *keyDialog
-	// shotSaveFile writes every confirmed shot to disk and adds its path to
-	// the clipboard next to the image.
+	// shotSaveFile writes every confirmed shot to disk. Copying the path itself
+	// is a per-shot checkbox in the selection toolbar.
 	shotSaveFile bool
 }
 type recordJob struct {
@@ -282,7 +282,7 @@ func hasArg(args []string, want string) bool {
 // saveShotItem toggles writing a file copy (and its path on the clipboard)
 // for every confirmed shot.
 func saveShotItem(a *app) *mygo.MenuItem {
-	item := &mygo.MenuItem{Label: "截图同时保存文件并复制路径", Checked: a.shotSaveFile}
+	item := &mygo.MenuItem{Label: "截图保存文件", Checked: a.shotSaveFile}
 	item.Click = func(*mygo.MenuItem, *mygo.Window) {
 		a.shotSaveFile = !a.shotSaveFile
 		item.SetChecked(a.shotSaveFile)

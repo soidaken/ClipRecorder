@@ -50,6 +50,7 @@ type selection struct {
 	capturing          bool
 	quality            shotQuality
 	card               bool
+	copyPath           bool
 	pointerDown        bool
 	moving             bool
 	moveDX, moveDY     float32
@@ -305,7 +306,7 @@ func (s *selection) view(c *ui.Context) {
 			s.recordControls(c, bx, by, panelWidth)
 			return
 		}
-		panelWidth := min(float32(428), width-16)
+		panelWidth := min(float32(520), width-16)
 		bx := max(float32(8), min(width-panelWidth-8, s.rect.X+s.rect.W-panelWidth))
 		by := s.rect.Y + s.rect.H + 10
 		if by+54 > height {
@@ -330,6 +331,7 @@ func (s *selection) view(c *ui.Context) {
 			if cardButton(c, s.card).Label("截图圆角阴影").Clicked() {
 				s.card = !s.card
 			}
+			pathCheckbox(c, &s.copyPath)
 			if confirmButton(c, "确认", true).Grow(1).Clicked() {
 				s.confirm()
 			}
@@ -420,12 +422,12 @@ func (s *selection) copyImage(img image.Image) {
 			return
 		}
 		pngBytes := out.Bytes()
-		data := transfer.New(transfer.NewItem(transfer.Bytes(transfer.PNG, pngBytes)))
+		data := shotClipboard(pngBytes, "")
 		if s.app != nil && s.app.shotSaveFile {
 			path, err := saveShot(pngBytes)
 			if err != nil {
 				s.app.notify("截图保存失败", err.Error())
-			} else {
+			} else if s.copyPath {
 				data = shotClipboard(pngBytes, path)
 			}
 		}
@@ -454,10 +456,15 @@ func saveShot(pngBytes []byte) (string, error) {
 	return path, os.WriteFile(path, pngBytes, 0o644)
 }
 
-// shotClipboard carries the image, the file and its absolute path in one
-// payload: image apps take the bitmap, editors take the text, and apps that
-// accept files take the dropped file.
+// shotClipboard carries the image; with a path it also carries the file and
+// that absolute path. Image-only is the default because apps that see text
+// next to a bitmap paste the text (WPS cells, for one), while an image-only
+// payload is pasted as a picture everywhere.
 func shotClipboard(pngBytes []byte, path string) transfer.Data {
+	item := transfer.NewItem(transfer.Bytes(transfer.PNG, pngBytes))
+	if path == "" {
+		return transfer.New(item)
+	}
 	return transfer.New(transfer.NewItem(
 		transfer.Bytes(transfer.PNG, pngBytes),
 		transfer.Bytes(transfer.Text, []byte(path)),

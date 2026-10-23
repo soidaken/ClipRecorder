@@ -199,3 +199,38 @@ func cardButton(c *ui.Context, on bool) ui.Element {
 	})
 	return b
 }
+
+// pathCheckbox is the small "复制路径" toggle of the shot toolbar: unchecked by
+// default, because text on the clipboard makes apps like WPS paste the path
+// instead of the picture.
+func pathCheckbox(c *ui.Context, checked *bool) {
+	row := ui.CheckboxBase(c, checked).Height(32).Gap(6).Padding(0, 9).
+		Radius(8).Cursor(ui.CursorPointer).FocusRing(false).Shrink(0).Label("复制路径")
+	on := *checked
+	fill, edge := ui.RGBA(255, 255, 255, 0.03), ui.RGBA(255, 255, 255, 0.08)
+	if on {
+		fill, edge = ui.RGBA(185, 221, 246, 0.14), ui.RGBA(185, 221, 246, 0.34)
+	} else if row.Hovered() {
+		fill = ui.RGBA(255, 255, 255, 0.08)
+	}
+	row.Background(fill).Border(1, edge).Children(func() {
+		box := ui.Box(c).Size(14, 14).Radius(4).Shrink(0)
+		if on {
+			box.Background(ice)
+		} else {
+			box.Background(ui.RGBA(0, 0, 0, 0.12)).Border(1, ui.RGBA(255, 255, 255, 0.28))
+		}
+		box.DrawOver(func(p *ui.Painter, r ui.Rect) {
+			if on {
+				var check ui.Path
+				check.MoveTo(r.X+3, r.Y+7).LineTo(r.X+6, r.Y+10).LineTo(r.X+11, r.Y+4)
+				p.StrokePath(&check, 1.5, ui.RGB(24, 35, 45))
+			}
+		})
+		color := muted
+		if on {
+			color = ice
+		}
+		ui.Text(c, "复制路径").FontSize(11.5).TextColor(color).PassThrough()
+	})
+}

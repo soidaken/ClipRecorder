@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/transfer"
+	"github.com/egoist/mygo/ui"
 )
 
 func TestSaveShotWritesFile(t *testing.T) {
@@ -43,6 +44,34 @@ func TestSaveShotWritesFile(t *testing.T) {
 	saved, err := os.ReadFile(path)
 	if err != nil || len(saved) != len(data) {
 		t.Fatalf("content mismatch: %v", err)
+	}
+}
+
+func TestShotClipboardIsImageOnlyByDefault(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	var buf strings.Builder
+	_ = buf
+	f, err := os.CreateTemp(t.TempDir(), "shot-*.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	data, err := os.ReadFile(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := shotClipboard(data, "")
+	formats := payload.Formats()
+	for _, f := range formats {
+		if f == transfer.Text || f == transfer.FileList || f == transfer.URIList {
+			t.Fatalf("image-only payload must not carry %s: %v", f, formats)
+		}
+	}
+	if _, err := payload.Read(transfer.PNG); err != nil {
+		t.Fatalf("image missing: %v", err)
 	}
 }
 
@@ -85,5 +114,24 @@ func TestShotClipboardCarriesImageFileAndPath(t *testing.T) {
 	}
 	if !strings.Contains(fileURI(path), "file:///") || !strings.Contains(fileURI(path), "%20") {
 		t.Fatalf("file URI not encoded: %s", fileURI(path))
+	}
+}
+
+func TestCopyPathCheckboxDefaultsOff(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 900, 600))
+	s := &selection{desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
+		selected: true, rect: ui.Rect{X: 60, Y: 40, W: 700, H: 400}, quality: qualityMedium, card: true}
+	tt := ui.NewTester(s.view, 900, 600)
+	if s.copyPath {
+		t.Fatal("copying the path must be off by default")
+	}
+	if !tt.HasText("复制路径") {
+		t.Fatal("path checkbox missing from the toolbar")
+	}
+	if err := tt.Click("复制路径"); err != nil {
+		t.Fatal(err)
+	}
+	if !s.copyPath {
+		t.Fatalf("checkbox did not toggle, copyPath=%v", s.copyPath)
 	}
 }
