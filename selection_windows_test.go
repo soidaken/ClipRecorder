@@ -208,3 +208,84 @@ func TestEncoderCheckUpdatesHardwareChoice(t *testing.T) {
 		t.Fatal("an explicit software choice should be retained")
 	}
 }
+
+func TestEncoderBadgeFollowsResolvedMode(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 800, 600))
+	base := func() *selection {
+		s := &selection{record: true, desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
+			selected: true, rect: ui.Rect{X: 100, Y: 100, W: 400, H: 300},
+			options: recording.DefaultOptions(), fpsIndex: 1, hardwareChecked: true, hardwareNames: []string{"NVIDIA H.264 Encoder MFT"}}
+		s.options.FPS = 60
+		return s
+	}
+	s := base()
+	tt := ui.NewTester(s.view, 800, 600)
+	if !tt.HasText("硬编") || tt.HasText("软编") {
+		t.Fatalf("auto with hardware available must show 硬编")
+	}
+	if !tt.HasText("目标") {
+		t.Fatal("bitrate line missing")
+	}
+
+	s = base()
+	s.options.Encoding = recording.EncodingSoftware
+	tt = ui.NewTester(s.view, 800, 600)
+	if !tt.HasText("软编") || tt.HasText("硬编") {
+		t.Fatalf("forced software must show 软编")
+	}
+
+	s = base()
+	s.hardwareNames = nil
+	tt = ui.NewTester(s.view, 800, 600)
+	if !tt.HasText("软编") {
+		t.Fatalf("auto without hardware must show 软编")
+	}
+
+	s = base()
+	s.hardwareError = errorStub{}
+	tt = ui.NewTester(s.view, 800, 600)
+	if tt.HasText("硬编") || tt.HasText("软编") {
+		t.Fatal("no badge while the encoder check failed")
+	}
+}
+
+type errorStub struct{}
+
+func (errorStub) Error() string { return "probe failed" }
+
+func TestRecordingDragMovesSelection(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 1200, 900))
+	s := &selection{record: true, desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
+		options: recording.DefaultOptions(), fpsIndex: 1, hardwareChecked: true, hardwareNames: []string{"测试硬件编码器"},
+		selected: true, rect: ui.Rect{X: 100, Y: 100, W: 400, H: 300}}
+	tt := ui.NewTester(s.view, 1200, 900)
+	tt.Press(200, 200)
+	tt.Move(260, 240)
+	tt.Release(260, 240)
+	if s.rect.X != 160 || s.rect.Y != 140 || s.rect.W != 400 || s.rect.H != 300 {
+		t.Fatalf("selection did not move as a whole: %+v", s.rect)
+	}
+	if s.moving {
+		t.Fatal("moving must stop on release")
+	}
+	// Dragging past the screen edge keeps the region inside it.
+	tt.Press(200, 200)
+	tt.Move(0, 0)
+	tt.Release(0, 0)
+	if s.rect.X != 0 || s.rect.Y != 0 || s.rect.W != 400 || s.rect.H != 300 {
+		t.Fatalf("move must stay on screen: %+v", s.rect)
+	}
+}
+
+func TestScreenshotDragStillRedraws(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 800, 600))
+	s := &selection{desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
+		selected: true, rect: ui.Rect{X: 100, Y: 100, W: 300, H: 200}}
+	tt := ui.NewTester(s.view, 800, 600)
+	tt.Press(200, 200)
+	tt.Move(300, 260)
+	tt.Release(300, 260)
+	if s.rect.X != 200 || s.rect.Y != 200 || s.rect.W != 100 || s.rect.H != 60 {
+		t.Fatalf("screenshot drag must redraw, not move: %+v", s.rect)
+	}
+}

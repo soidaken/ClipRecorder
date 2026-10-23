@@ -139,7 +139,7 @@ func (a *app) beginSelection(record, translate bool) {
 		a.notify("截图失败", err.Error())
 		return
 	}
-	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium}
+	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true}
 	a.selection = s
 	s.window = mygo.NewWindow(mygo.WindowOptions{
 		Title: "ClipRecorder · 选择区域", Content: ui.View(s.view), Hidden: true,
@@ -172,7 +172,10 @@ func (a *app) record(rect image.Rectangle, options recording.Options) {
 	j.window = mygo.NewWindow(mygo.WindowOptions{
 		Title: "ClipRecorder · 正在录制", Content: ui.View(func(c *ui.Context) { a.recordView(c, j) }),
 		Hidden: true, Width: recordingBarWidth, Height: recordingBarHeight, Frameless: true, Panel: true, AlwaysOnTop: true, SkipTaskbar: true,
-		DisableResize: true, DisableMaximize: true, BackgroundColor: "#1c2229", Vibrancy: mygo.VibrancyAcrylic,
+		DisableResize: true, DisableMaximize: true,
+		// Transparent window: the rounded bar paints itself, and the corners
+		// stay fully transparent instead of showing the window background.
+		Transparent: true,
 	})
 	j.window.SetContentProtection(true)
 	placeRecordingBar(j.window, rect)
@@ -191,6 +194,9 @@ func (a *app) record(rect image.Rectangle, options recording.Options) {
 				a.notify("录屏失败", err.Error())
 			} else {
 				a.notify("录屏已保存", path)
+				// The saved file's absolute path goes to the clipboard, so it can
+				// be pasted straight into a chat or a terminal.
+				mygo.Clipboard.WriteText(path)
 				if openErr := mygo.Shell.OpenPath(filepath.Dir(path)); openErr != nil {
 					a.notify("打开存放目录失败", fmt.Sprintf("文件已保存至 %s：%v", path, openErr))
 				}
@@ -211,10 +217,9 @@ func (a *app) stop() {
 }
 func (a *app) recordView(c *ui.Context, j *recordJob) {
 	toolTheme(c)
-	top, bottom := ui.RGBA(43, 52, 62, 0.34), ui.RGBA(17, 23, 30, 0.24)
-	if !c.Vibrancy() {
-		top, bottom = ui.RGB(41, 48, 57), ui.RGB(26, 32, 40)
-	}
+	// Just shy of opaque: the transparent window shows no plate behind the
+	// corners, while the bar keeps its text readable over any content.
+	top, bottom := ui.RGBA(41, 48, 57, 0.96), ui.RGBA(26, 32, 40, 0.94)
 	root := ui.Row(c).Fill().Padding(13, 18).Gap(18).Radius(12).
 		Gradient(top, bottom, 180).Border(1, ui.RGBA(255, 255, 255, 0.22)).
 		InsetShadow(0, 1, 0, 0, ui.RGBA(255, 255, 255, 0.12)).DragWindow()

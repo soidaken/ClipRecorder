@@ -49,9 +49,10 @@ type selection struct {
 	blurDraft          ui.Rect
 	capturing          bool
 	quality            shotQuality
+	card               bool
 	pointerDown        bool
-	hintBackdrop       *ui.Bitmap
-	hintRect           ui.Rect
+	moving             bool
+	moveDX, moveDY     float32
 }
 
 type encoderParams struct {
@@ -118,6 +119,22 @@ func (s *selection) applyEncoderCheck(info recording.EncoderInfo, err error) {
 	}
 }
 
+// encoderUsesHardware reports which encoder the current parameters will use:
+// auto prefers hardware, software is forced, hardware only when it passed.
+func (s *selection) encoderUsesHardware() bool {
+	if !s.hardwareChecked || s.hardwareError != nil {
+		return false
+	}
+	switch s.options.Encoding {
+	case recording.EncodingSoftware:
+		return false
+	case recording.EncodingHardware:
+		return true
+	default:
+		return len(s.hardwareNames) > 0
+	}
+}
+
 func (s *selection) encodingStatus() string {
 	if !s.selected {
 		return "框选区域后，按所选参数检测编码方式"
@@ -161,11 +178,30 @@ func (s *selection) view(c *ui.Context) {
 	root := ui.Box(c).Fill().Cursor(ui.CursorCrosshair)
 	x, y, over := root.PointerPosition()
 	pressed := root.Pressed()
+	if s.record && s.selected && over && s.insideSelection(x, y) {
+		// Setting the cursor on the node; the returned view wrapper would not
+		// carry this frame's pointer state.
+		root.Cursor(ui.CursorMove)
+	}
 	// A press only counts where it started: dragging in from outside the
 	// selection must not draw, place markers or start a new region.
 	fresh := pressed && !s.pointerDown
 	s.pointerDown = pressed
-	if s.selected && s.tool != toolNone && s.insideSelection(x, y) {
+	if s.record && s.selected && (s.moving || (fresh && over && s.insideSelection(x, y))) {
+		// Recording: dragging inside the chosen region moves it as a whole.
+		if fresh && !s.moving {
+			s.moving = true
+			s.moveDX, s.moveDY = x-s.rect.X, y-s.rect.Y
+		}
+		if !pressed {
+			s.moving = false
+		} else {
+			width := float32(s.desktop.Dx()) / float32(s.scale)
+			height := float32(s.desktop.Dy()) / float32(s.scale)
+			s.rect.X = min(max(0, x-s.moveDX), max(0, width-s.rect.W))
+			s.rect.Y = min(max(0, y-s.moveDY), max(0, height-s.rect.H))
+		}
+	} else if s.selected && s.tool != toolNone && s.insideSelection(x, y) {
 		s.handleAnnotationInput(x, y, pressed, fresh)
 	} else if s.dragging {
 		if pressed {
@@ -269,7 +305,7 @@ func (s *selection) view(c *ui.Context) {
 			s.recordControls(c, bx, by, panelWidth)
 			return
 		}
-		panelWidth := min(float32(390), width-16)
+		panelWidth := min(float32(428), width-16)
 		bx := max(float32(8), min(width-panelWidth-8, s.rect.X+s.rect.W-panelWidth))
 		by := s.rect.Y + s.rect.H + 10
 		if by+54 > height {
@@ -277,10 +313,7 @@ func (s *selection) view(c *ui.Context) {
 		}
 		// The hint sits in the same band as the toolbar, aligned to the left
 		// edge of the chosen region.
-		hintX := max(float32(8), s.rect.X)
-		if limit := bx - 8 - hintChipWidth; hintX > limit {
-			hintX = max(float32(8), limit)
-		}
+		hint := s.hintChipAt(bx, by)
 
 		glassPanel(ui.Row(c).Absolute().Left(bx).Top(by).Size(panelWidth, 54).Padding(9).Gap(6)).Children(func() {
 			for _, tool := range []annotationTool{toolPen, toolBlur, toolNumber, toolMark} {
@@ -294,13 +327,16 @@ func (s *selection) view(c *ui.Context) {
 			}
 			ui.Box(c).Size(1, 20).Shrink(0).Background(ui.RGBA(255, 255, 255, 0.14))
 			qualityControl(c, &s.quality)
+			if cardButton(c, s.card).Label("截图圆角阴影").Clicked() {
+				s.card = !s.card
+			}
 			if confirmButton(c, "确认", true).Grow(1).Clicked() {
 				s.confirm()
 			}
 		})
 		// Drawn last so it stays readable when a small selection makes the
 		// toolbar and the hint share the same band.
-		s.hintChip(c, hintX, by+(54-hintChipHeight)/2)
+		s.hintChip(c, hint)
 	})
 	if s.selected && !s.translate && c.Shortcut(0, ui.KeyEnter) {
 		s.confirm()
@@ -376,7 +412,7 @@ func (s *selection) copyAnnotated(rect image.Rectangle) {
 }
 
 func (s *selection) copyImage(img image.Image) {
-	copied := s.quality.resizeCopy(img)
+	copied := s.prepareCopy(img)
 	go func() {
 		var out bytes.Buffer
 		if err := png.Encode(&out, copied); err != nil {
@@ -490,7 +526,12 @@ func (s *selection) recordControls(c *ui.Context, x, y, width float32) {
 			w, h := r.Dx()/2*2, r.Dy()/2*2
 			text = fmt.Sprintf("%d × %d · 目标 %.1f Mbps · H.264 High", w, h, float64(s.options.VideoBitrate(w, h))/1000000)
 		}
-		ui.Text(c, text).FontSize(11).TextColor(muted)
+		ui.Row(c).Gap(8).Children(func() {
+			ui.Text(c, text).FontSize(11).TextColor(muted).Grow(1)
+			if s.selected && s.hardwareChecked && s.hardwareError == nil {
+				encoderBadge(c, s.encoderUsesHardware(), strings.Join(s.hardwareNames, "、"))
+			}
+		})
 		ui.Box(c).Height(1).Background(ui.RGBA(255, 255, 255, 0.08)).PassThrough()
 		ui.Row(c).Gap(8).Children(func() {
 			label := "开始录制"
@@ -521,51 +562,29 @@ var hintChipWidth = func() float32 {
 	return w + 20
 }()
 
-// hintChip shows "Esc 取消" in white on a rounded chip whose backdrop is the
-// frozen screen blurred and dimmed exactly like the rest of the overlay, so it
-// blends in instead of looking like a flat coloured block.
-func (s *selection) hintChip(c *ui.Context, x, y float32) {
+// hintChip shows "Esc 取消" on one fixed dark chip. Blending the frozen page
+// into it made it look like a light plate on white pages and like glass on
+// dark ones; a constant colour reads the same everywhere.
+func (s *selection) hintChip(c *ui.Context, r ui.Rect) {
 	text := "Esc 取消"
 	font := ui.Font{Family: uiFont, Size: 12}
 	layout := ui.ShapeText(text, font, 0)
-	textW, textH := layout.Size()
+	_, textH := layout.Size()
 	padding := float32(10)
-	chipW := textW + 2*padding
-	chip := ui.Box(c).Absolute().Left(x).Top(y).Size(chipW, hintChipHeight).PassThrough()
-	chip.Draw(func(p *ui.Painter, r ui.Rect) {
-		s.hintBackdropFor(r)
-		if s.hintBackdrop != nil {
-			w, h := s.hintBackdrop.Size()
-			p.ImageRegion(s.hintBackdrop, ui.Rect{W: float32(w), H: float32(h)}, r, ui.ImageOptions{})
-		}
-		// The same dark glass tint as the toolbar, over the blurred pixels, so
-		// the chip reads as part of the overlay instead of a lighter plate
-		// pasted on top of it.
-		p.Fill(r, ui.RGBA(22, 28, 35, 0.5), 8)
-		p.Stroke(r, ui.RGBA(255, 255, 255, 0.16), 8, 1)
-		textX := r.X + padding
-		textY := r.Y + (r.H-textH)/2
-		p.TextLayout(layout, textX, textY+1, ui.RGBA(0, 0, 0, 0.6))
-		p.TextLayout(layout, textX, textY, ui.RGB(255, 255, 255))
+	chip := ui.Box(c).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).PassThrough()
+	chip.Draw(func(p *ui.Painter, box ui.Rect) {
+		p.Fill(box, ui.RGBA(20, 25, 32, 0.92), 8)
+		p.Stroke(box, ui.RGBA(255, 255, 255, 0.18), 8, 1)
+		p.TextLayout(layout, box.X+padding, box.Y+(box.H-textH)/2, ui.RGB(255, 255, 255))
 	})
 }
 
-// hintBackdropFor caches the blurred pixels under the hint chip.
-func (s *selection) hintBackdropFor(r ui.Rect) {
-	if s.hintBackdrop != nil && s.hintRect == r {
-		return
+// hintChipAt places the hint in the toolbar band, aligned with the selection's
+// left edge and moved aside when the toolbar would overlap it.
+func (s *selection) hintChipAt(toolbarX, toolbarY float32) ui.Rect {
+	x := max(float32(8), s.rect.X)
+	if limit := toolbarX - 8 - hintChipWidth; x > limit {
+		x = max(float32(8), limit)
 	}
-	scale := float32(s.scale)
-	src := image.Rect(int(r.X*scale), int(r.Y*scale), int((r.X+r.W)*scale), int((r.Y+r.H)*scale)).Intersect(s.snapshot.Bounds())
-	if src.Empty() {
-		s.hintBackdrop = nil
-		return
-	}
-	crop := image.NewRGBA(image.Rect(0, 0, src.Dx(), src.Dy()))
-	region := s.snapshot.SubImage(src).(*image.RGBA)
-	for y := 0; y < src.Dy(); y++ {
-		copy(crop.Pix[y*crop.Stride:y*crop.Stride+src.Dx()*4], region.Pix[y*region.Stride:y*region.Stride+src.Dx()*4])
-	}
-	s.hintBackdrop = ui.NewBitmap(blurRGBA(crop, hintBlurSigma*s.scale))
-	s.hintRect = r
+	return ui.Rect{X: x, Y: toolbarY + (54-hintChipHeight)/2, W: hintChipWidth, H: hintChipHeight}
 }

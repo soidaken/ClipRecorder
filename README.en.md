@@ -9,7 +9,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 ## What it does
 
 - **Screenshot**: drag a region and copy it to the clipboard.
-- **Record**: record a region to H.264 / MP4, with system audio and microphone, aspect-ratio presets, frame rate, quality and hardware-encoder options.
+- **Record**: record a region to H.264 / MP4, with system audio and microphone, aspect-ratio presets, frame rate, quality and hardware-encoder options. A "硬编 / 软编" badge on the bitrate line shows which encoder the current parameters will actually use.
 - **Region translate**: drag over English text; the screenshot itself is sent to the model, which reads and translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible.
 
 ## Basic usage
@@ -17,7 +17,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+I` | Select a region → click the green "确认" button or press `Enter` |
-| `Ctrl+R` | Select a region → set options → click "Start recording" or press `Enter` |
+| `Ctrl+R` | Select a region → set options → click "Start recording" or press `Enter`; drag inside the region to move it as a whole |
 | `Ctrl+T` | Select English text → release to recognize and translate in place |
 | `Ctrl+Shift+T` / "Stop" on the floating bar | Stop and save the recording |
 | `Esc` / right click | Cancel the selection |
@@ -33,13 +33,15 @@ After selecting a region the toolbar offers three annotation tools, all off by d
 - **Number**: click inside the selection to drop 1, 2, 3… in red circles (radius 12 px) with bold white digits.
 - **Region mark**: drag a 6 px red dashed rounded box inside the selection; any number of them.
 
+A confirmed shot gets rounded corners and a soft drop shadow: the capture is inset, the padding around it stays fully transparent (PNG keeps its alpha) and only a downward shadow is drawn, so it floats on any page without a coloured plate. Turn it off with the square icon in the toolbar to copy the raw 1:1 shot.
+
 Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\` and puts the file and its absolute path on the clipboard alongside the image, so apps can take the bitmap, the file or the text. Turn it off with "截图同时保存文件并复制路径" in the tray menu.
 
 Annotations are included in the copied image. The bottom-left hint cancels with `Esc`. Once a region is chosen, clicking outside it does nothing; press `Esc` and select again to change it. Dragging from inside the region redraws it and clears the annotations.
 
 The 低 / 中 / 高 (low / medium / high) segments set the copied resolution: low caps the longest side at 1280 px, medium (default) and high copy at the screen's physical pixels, 1:1. The clipboard only carries lossless PNG, so medium and high are the sharpest possible.
 
-Recordings are saved to `%USERPROFILE%\Videos\ClipRecorder\`.
+Recordings are saved to `%USERPROFILE%\Videos\ClipRecorder\`; when a recording finishes, its absolute path is copied to the clipboard.
 
 The first translation asks for a DeepSeek API key, which is then encrypted with Windows DPAPI and stored locally (`%APPDATA%\ClipRecorder\deepseek-key.dat`). The selected screenshot is sent to DeepSeek as JPEG for recognition and translation.
 

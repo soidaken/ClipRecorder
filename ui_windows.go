@@ -159,3 +159,43 @@ func confirmButton(c *ui.Context, label string, enabled bool) ui.Element {
 	})
 	return b
 }
+
+// encoderBadge marks the encoder the current parameters will use, next to the
+// bitrate line: hardware in the toolbar accent, software in neutral grey.
+func encoderBadge(c *ui.Context, hardware bool, detail string) ui.Element {
+	label := "软编"
+	fill, edge, color := ui.RGBA(255, 255, 255, 0.06), ui.RGBA(255, 255, 255, 0.12), muted
+	if hardware {
+		label, fill, edge, color = "硬编", ui.RGBA(185, 221, 246, 0.16), ui.RGBA(185, 221, 246, 0.4), ice
+	}
+	b := ui.Row(c).Height(18).Padding(0, 7).Radius(5).Shrink(0).AlignItems(ui.Center).
+		Background(fill).Border(1, edge)
+	b.Children(func() {
+		ui.Text(c, label).FontSize(10).FontWeight(600).TextColor(color)
+	})
+	if detail != "" {
+		b = b.Tooltip(detail)
+	}
+	return b
+}
+
+// cardButton toggles the rounded card look of the confirmed shot: a small
+// square with a page-shaped outline, tinted while it is on.
+func cardButton(c *ui.Context, on bool) ui.Element {
+	b := ui.ButtonBase(c).Size(32, 32).Radius(9).Cursor(ui.CursorPointer).FocusRing(false)
+	fill, edge := ui.Transparent, ui.Transparent
+	color := muted
+	if on {
+		fill, edge, color = ui.RGBA(185, 221, 246, 0.16), ui.RGBA(185, 221, 246, 0.38), ice
+	} else if b.Hovered() {
+		fill = ui.RGBA(255, 255, 255, 0.08)
+	}
+	b.Background(fill).Border(1, edge)
+	b.DrawOver(func(p *ui.Painter, r ui.Rect) {
+		cx, cy := r.X+r.W/2, r.Y+r.H/2
+		outer := ui.Rect{X: cx - 9, Y: cy - 7, W: 18, H: 14}
+		p.Stroke(outer, color, 3, 1.4)
+		p.Stroke(ui.Rect{X: cx - 5.5, Y: cy - 4, W: 11, H: 8}, color, 2, 1.2)
+	})
+	return b
+}
