@@ -184,3 +184,21 @@ func TestModelImageCapsPixels(t *testing.T) {
 		t.Fatal("small selections must be sent untouched")
 	}
 }
+
+func TestTranslationOverlayHasTwoPixelBorder(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 400, 200))
+	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{
+		{Text: "你好", X: 0.1, Y: 0.2, W: 0.3, H: 0.1, Color: "#000000"},
+	}}
+	tt := ui.NewTester(o.view, 400, 200)
+	im := tt.Image()
+	for _, pt := range []image.Point{{0, 100}, {1, 100}, {398, 100}, {399, 100}, {200, 0}, {200, 1}, {200, 198}, {200, 199}} {
+		if p := im.RGBAAt(pt.X, pt.Y); p.R > 200 {
+			t.Fatalf("border missing at %v: %+v", pt, p)
+		}
+	}
+	// Just inside the border the sheet is white again.
+	if p := im.RGBAAt(3, 100); p.R < 240 || p.G < 240 || p.B < 240 {
+		t.Fatalf("inner area must stay white: %+v", p)
+	}
+}

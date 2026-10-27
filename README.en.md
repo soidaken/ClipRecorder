@@ -10,7 +10,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 
 - **Screenshot**: drag a region and copy it to the clipboard.
 - **Record**: record a region to H.264 / MP4, with system audio and microphone, aspect-ratio presets, frame rate, quality and hardware-encoder options. A "硬编 / 软编" badge on the bitrate line shows which encoder the current parameters will actually use.
-- **Region translate**: drag over English text; the screenshot itself is sent to the model, which reads and translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible.
+- **Region translate**: drag over English text; the screenshot itself is sent to the model, which reads and translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible. The overlay has a 2 px frame and closes with `Esc` (even when another window has the focus) or a right click.
 
 ## Basic usage
 

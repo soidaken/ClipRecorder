@@ -91,6 +91,10 @@ func (a *app) showKeyDialog(resume func()) {
 	d.window.Focus()
 }
 
+// The overlay is a plain white sheet over the page, so a hairline frame marks
+// where the translated region ends.
+const translationBorderWidth = float32(2)
+
 type translationOverlay struct {
 	window *mygo.Window
 	cancel context.CancelFunc
@@ -133,12 +137,18 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 	o.scale = windowScale(o.window)
 	o.window.OnClosed(func() {
 		cancel()
+		mygo.GlobalShortcut.Unregister("Escape")
 		if a.translation == o {
 			a.translation = nil
 		}
 	})
 	o.window.Show()
 	o.window.Focus()
+	// Esc must close the overlay even when another window has the focus, so it
+	// is registered as a global shortcut for as long as the overlay lives.
+	if err := mygo.GlobalShortcut.Register("Escape", func() { a.closeTranslation() }); err != nil {
+		log.Print("注册 Esc 关闭翻译失败: ", err)
+	}
 
 	// Keep both copies next to each other: the source crop and the rendered
 	// translation, told apart by the trailing marker.
@@ -208,7 +218,8 @@ func (o *translationOverlay) view(c *ui.Context) {
 		o.window.Close()
 		return
 	}
-	root := ui.Box(c).Fill().Background(ui.RGB(255, 255, 255)).Clip()
+	root := ui.Box(c).Fill().Background(ui.RGB(255, 255, 255)).
+		Border(translationBorderWidth, ui.RGBA(0, 0, 0, 0.28)).Clip()
 	if root.RightClicked() {
 		o.window.Close()
 		return
