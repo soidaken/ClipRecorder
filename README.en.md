@@ -33,7 +33,7 @@ After selecting a region the toolbar offers three annotation tools, all off by d
 - **Number**: click inside the selection to drop 1, 2, 3… in red circles (radius 12 px) with bold white digits.
 - **Region mark**: drag a 6 px red dashed rounded box inside the selection; any number of them.
 
-A confirmed shot gets rounded corners and a soft drop shadow: the capture is inset, the padding around it stays fully transparent (PNG keeps its alpha) and only a downward shadow is drawn, so it floats on any page without a coloured plate. Turn it off with the square icon in the toolbar to copy the raw 1:1 shot.
+A confirmed shot looks like a macOS window capture: continuous rounded corners with smooth antialiased edges, a hairline outline and a soft shadow cast downwards. The padding around it stays fully transparent (PNG keeps its alpha) and the shadow scales with the shot, so it floats on any page without a coloured plate. Turn it off with the square icon in the toolbar to copy the raw 1:1 shot.
 
 Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\`. "复制路径" in the toolbar is ticked by default: the clipboard then carries the image (PNG + DIB), the file and its absolute path as text, so chat and office apps take the picture or the file and text-only inputs (a terminal, say) get the path. A few apps, such as WPS/Excel cells, paste the path whenever text is present; untick it there to copy only the image. The clipboard is handed over to the system in full right after confirming, so pasting keeps working even if ClipRecorder is busy or has exited.
 
