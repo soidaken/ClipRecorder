@@ -10,7 +10,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 
 - **Screenshot**: drag a region and copy it to the clipboard.
 - **Record**: record a region to H.264 / MP4, with system audio and microphone, aspect-ratio presets, frame rate, quality and hardware-encoder options. A "硬编 / 软编" badge on the bitrate line shows which encoder the current parameters will actually use.
-- **Region translate**: drag over English text; the screenshot itself is sent to the model, which reads and translates it, and the Chinese result is drawn over the same region on a white background, keeping the original layout and text color where possible. The overlay has a 2 px frame and closes with `Esc` (even when another window has the focus) or a right click.
+- **Region translate**: drag over English text and it turns into Chinese in place: cards, buttons, backgrounds and icons stay, only the English is erased and the Chinese is set where it was, in its colour, size, weight and alignment, with paragraphs reflowed to their width. A scan band passes over the selection while it is translated; hold the mouse button down on the result to see the source. The overlay has a 2 px frame and closes with `Esc` (even when another window has the focus) or a right click.
 
 ## Basic usage
 
@@ -47,7 +47,7 @@ The first translation asks for a DeepSeek API key, which is then encrypted with 
 
 Every selection saves two images to the Downloads folder: `translate_<time>.jpg` is the crop sent to the model, and `translate_<time>_zh.png` is the rendered Chinese result.
 
-Original colors that are too light (for example white text on a dark background) are darkened until they are readable on white, keeping the hue where possible. Before upload the crop is scaled to the resolution the model works at (about 1.7 megapixels) to keep the request small; lines of one block share a font size, centered titles stay centered, and any line that still comes back in English is retranslated once in a small text-only request. Installing or upgrading closes a running ClipRecorder, letting an active recording finish saving first.
+Two things run at once: Windows OCR finds every word's exact position locally, and DeepSeek's vision model reads and translates the text paragraph by paragraph. The two are matched on the source text, and size, baseline, text colour, background and alignment are measured on the screenshot's pixels, so the translation lands exactly where the source was. Numbers, dates and addresses that need no translation keep their original pixels. Without an OCR language, or when nothing can be placed, the translation is listed on a plain sheet instead. Before upload the crop is scaled to the resolution the model works at (about 1.7 megapixels) to keep the request small, and any block that still comes back in English is retranslated once in a small text-only request. Installing or upgrading closes a running ClipRecorder, letting an active recording finish saving first.
 
 ## Tech stack
 
@@ -57,8 +57,8 @@ Original colors that are too light (for example white text on a dark background)
 | Capture | Win32 GDI `BitBlt` called directly from Go, sharing the recording frame buffer |
 | Video | Windows Media Foundation, H.264 / MP4, hardware encoder auto-detected (e.g. NVENC) with software fallback |
 | Audio | WASAPI via [go-wca](https://github.com/moutend/go-wca): system loopback + microphone mixed into AAC 48 kHz |
-| OCR | No local OCR: DeepSeek's vision model reads the screenshot directly |
-| Translation | DeepSeek Chat API, receiving only the recognized text |
+| OCR | DeepSeek's vision model reads paragraphs; built-in Windows OCR locates the words locally |
+| Translation | DeepSeek Chat API |
 
 ## Download
 

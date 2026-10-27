@@ -57,41 +57,37 @@ func TestTranslateImageSendsImageAsData(t *testing.T) {
 			t.Error("JSON output required")
 		}
 		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]string{
-			"content": `{"lines":[{"text":"你好，世界","x":0.1,"y":0.2,"w":0.5,"h":0.1,"color":"abc"}]}`,
+			"content": `{"blocks":[{"src":"Hello, world","text":"你好，世界","bold":true}]}`,
 		}}}})
 	}))
 	defer server.Close()
-	lines, err := (Client{Endpoint: server.URL}).TranslateImage(context.Background(), "test-key", image)
+	blocks, err := (Client{Endpoint: server.URL}).TranslateImage(context.Background(), "test-key", image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 || lines[0].Text != "你好，世界" || lines[0].Color != "#aabbcc" {
-		t.Fatalf("unexpected result: %+v", lines)
+	if len(blocks) != 1 || blocks[0] != (Block{Src: "Hello, world", Text: "你好，世界", Bold: true}) {
+		t.Fatalf("unexpected result: %+v", blocks)
 	}
 }
 
-func TestTranslateImageClampsAndDropsBadLines(t *testing.T) {
+func TestTranslateImageDropsBlocksItCannotPlace(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]string{
-			"content": `{"lines":[{"text":"越界","x":0.9,"y":0.95,"w":0.8,"h":0.8,"color":"#123456"},{"text":"  ","x":0.1,"y":0.1,"w":0.2,"h":0.2},{"text":"无效","x":0.1,"y":0.1,"w":0,"h":0.2}]}`,
+			"content": `{"blocks":[{"src":" Price ","text":" 价格 "},{"src":"","text":"无原文"},{"src":"Empty","text":"  "}]}`,
 		}}}})
 	}))
 	defer server.Close()
-	lines, err := (Client{Endpoint: server.URL}).TranslateImage(context.Background(), "test-key", []byte{1})
+	blocks, err := (Client{Endpoint: server.URL}).TranslateImage(context.Background(), "test-key", []byte{1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 {
-		t.Fatalf("unusable lines must be dropped: %+v", lines)
-	}
-	l := lines[0]
-	if l.X != 0.9 || l.Y != 0.95 || l.W < 0.099 || l.H < 0.049 {
-		t.Fatalf("coordinates not clamped: %+v", l)
+	if len(blocks) != 1 || blocks[0].Src != "Price" || blocks[0].Text != "价格" {
+		t.Fatalf("blocks without source or translation must be dropped, the rest trimmed: %+v", blocks)
 	}
 }
 
 func TestTranslateImageRejectsEmptyResults(t *testing.T) {
-	for _, content := range []string{`{"lines":[]}`, `{}`, `not JSON`} {
+	for _, content := range []string{`{"blocks":[]}`, `{}`, `not JSON`} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]string{"content": content}}}})
 		}))
@@ -108,51 +104,11 @@ func TestTranslateImageRejectsEmptyResults(t *testing.T) {
 	}
 }
 
-func TestNormalizeColor(t *testing.T) {
-	for value, want := range map[string]string{
-		"#224499": "#224499", "224499": "#224499", "#ABC": "#aabbcc",
-		"": "#000000", "nope": "#000000", "#1234567": "#000000",
-	} {
-		if got := NormalizeColor(value); got != want {
-			t.Fatalf("NormalizeColor(%q) = %q, want %q", value, got, want)
-		}
-	}
-}
-
-func TestContrastOnWhite(t *testing.T) {
-	cases := []struct {
-		name  string
-		input string
-	}{
-		{"white", "#ffffff"},
-		{"light grey", "#d0d0d0"},
-		{"yellow", "#ffe680"},
-		{"normal blue", "#224499"},
-		{"black", "#000000"},
-	}
-	for _, tc := range cases {
-		col := ContrastOnWhite(ParseColor(tc.input))
-		if l := Luminance(col); l > 0.2 {
-			t.Fatalf("%s stays unreadable on white: %v luminance %.3f", tc.name, col, l)
-		}
-	}
-	// A color that is already dark enough must keep its hue.
-	kept := ContrastOnWhite(ParseColor("#224499"))
-	if kept.R != 0x22 || kept.G != 0x44 || kept.B != 0x99 {
-		t.Fatalf("dark color changed: %v", kept)
-	}
-	// Pure white text must end up clearly visible, not a faint grey.
-	white := ContrastOnWhite(ParseColor("#ffffff"))
-	if Luminance(white) > 0.2 {
-		t.Fatalf("white text not darkened: %v", white)
-	}
-}
-
 func TestTranslateImageRetriesLinesLeftInEnglish(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		content := `{"lines":[{"text":"Hello world","x":0.1,"y":0.2,"w":0.5,"h":0.1,"color":"#111111"}]}`
+		content := `{"blocks":[{"src":"Hello world","text":"Hello world"}]}`
 		if calls == 2 {
 			var body capturedBody
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -179,7 +135,7 @@ func TestTranslateImageRetriesLinesLeftInEnglish(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("expected one repair request, got %d calls", calls)
 	}
-	if lines[0].Text != "你好，世界" || lines[0].X != 0.1 {
+	if lines[0].Text != "你好，世界" || lines[0].Src != "Hello world" {
 		t.Fatalf("repair did not replace the text: %+v", lines[0])
 	}
 }
@@ -189,7 +145,7 @@ func TestTranslationStaysSingleRequestForChinese(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]string{
-			"content": `{"lines":[{"text":"你好","x":0.1,"y":0.1,"w":0.2,"h":0.1,"color":"#000000"},{"text":"main.go","x":0.1,"y":0.3,"w":0.2,"h":0.1}]}`,
+			"content": `{"blocks":[{"src":"Hello","text":"你好"},{"src":"main.go","text":"main.go"}]}`,
 		}}}})
 	}))
 	defer server.Close()

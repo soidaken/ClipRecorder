@@ -2,80 +2,178 @@ package main
 
 import (
 	"image"
+	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"cliprecorder/internal/translation"
 	"github.com/egoist/mygo/ui"
 )
 
-func TestTranslationOverlayUsesNormalizedLayout(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 600, 200))
-	first := translation.Line{Text: "你好，世界", X: 0.1, Y: 0.1, W: 0.4, H: 0.12, Color: "#224499"}
-	second := translation.Line{Text: "这是下一行中文内容", X: 0.1, Y: 0.4, W: 0.7, H: 0.12, Color: "#000000"}
-	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{first, second}}
-	tt := ui.NewTester(o.view, 600, 200)
-	if !tt.HasText(first.Text) || !tt.HasText(second.Text) {
-		t.Fatal("overlay translation missing")
+func TestBreakLinesKeepsWordsWholeAndPunctuationAttached(t *testing.T) {
+	font := ui.Font{Family: translationFont, Size: 13}
+	text := "从 2026-11-01 起，IP 费用将添加到您的服务续费中。"
+	lines := breakLines(text, font, 90)
+	if len(lines) < 2 {
+		t.Fatalf("expected wrapping at 90 DIPs: %q", lines)
 	}
-	if p := tt.Image().RGBAAt(590, 190); p.R != 255 || p.G != 255 || p.B != 255 {
-		t.Fatalf("overlay must be white: %+v", p)
+	if strings.Join(lines, "") != strings.ReplaceAll(text, " ", "") && !strings.Contains(strings.Join(lines, " "), "2026-11-01") {
+		t.Fatalf("a date must not be split: %q", lines)
 	}
-	start, ok := tt.Find(first.Text)
-	if !ok {
-		t.Fatal("first line not rendered")
-	}
-	next, ok := tt.Find(second.Text)
-	if !ok {
-		t.Fatal("second line not rendered")
-	}
-	// Normalized 0.1/0.1 on a 600x200 image lands at 60/20.
-	if start.X < 50 || start.X > 75 || start.Y < 12 || start.Y > 34 {
-		t.Fatalf("normalized position not applied: %+v", start)
-	}
-	if next.Y <= start.Y {
-		t.Fatalf("reading order lost: %+v %+v", start, next)
+	for _, l := range lines {
+		if strings.ContainsAny(string([]rune(l)[0]), noLineStart) {
+			t.Fatalf("line starts with closing punctuation: %q", lines)
+		}
+		if w, _ := ui.ShapeText(l, font, 0).Size(); w > 90 && len([]rune(l)) > 1 && !strings.Contains(l, "2026-11-01") {
+			t.Fatalf("line wider than the width: %q (%.1f)", l, w)
+		}
 	}
 }
 
-func TestTranslationWaitingTextIsCentered(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 800, 400))
-	o := &translationOverlay{image: img, scale: 1, status: "正在识别并翻译…"}
-	tt := ui.NewTester(o.view, 800, 400)
-	pos, ok := tt.Find("正在识别并翻译…")
-	if !ok {
-		t.Fatal("waiting text missing")
+func region(text string, align translation.Align, lines ...translation.Line) translation.Region {
+	r := translation.Region{Text: text, Lines: lines, Em: lines[0].Em, Color: color.RGBA{20, 40, 80, 255}, Align: align,
+		MinX: lines[0].Box.X0, MaxX: lines[0].Box.X1}
+	return r
+}
+
+func TestLayoutCentersAButtonLabel(t *testing.T) {
+	r := region("继续", translation.AlignCenter, translation.Line{Box: translation.Rect{X0: 380, Y0: 628, X1: 442, Y1: 640}, Baseline: 640, Em: 17})
+	r.MinX, r.MaxX = 290, 532
+	placed := layoutRegions([]translation.Region{r}, 1)
+	if len(placed) != 1 {
+		t.Fatalf("one line expected: %d", len(placed))
 	}
-	centerX, centerY := pos.X+pos.W/2, pos.Y+pos.H/2
-	if centerX < 380 || centerX > 420 || centerY < 185 || centerY > 215 {
-		t.Fatalf("waiting text must sit in the middle: %+v", pos)
+	w, _ := placed[0].layout.Size()
+	if center := placed[0].x + w/2; center < 409 || center > 413 {
+		t.Fatalf("label must stay centred on 411: %.1f", center)
+	}
+	// The ideographs sit on the source line: their middle where Latin text
+	// had its middle, between baseline and cap height.
+	inkMiddle := placed[0].y + translationInkCenter*17
+	if want := float32(640 - latinCenter*17); inkMiddle < want-1 || inkMiddle > want+1 {
+		t.Fatalf("vertical middle %.1f, want %.1f", inkMiddle, want)
 	}
 }
 
-func TestTranslationWaitingTextIsTranslucentBlack(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 600, 300))
-	o := &translationOverlay{image: img, scale: 1, status: "正在识别并翻译…"}
-	tt := ui.NewTester(o.view, 600, 300)
-	pos, ok := tt.Find("正在识别并翻译…")
-	if !ok {
-		t.Fatal("waiting text missing")
+func TestLayoutSetsAParagraphOnTheSourceLines(t *testing.T) {
+	lines := []translation.Line{
+		{Box: translation.Rect{X0: 20, Y0: 235, X1: 510, Y1: 247}, Baseline: 244, Em: 13},
+		{Box: translation.Rect{X0: 20, Y0: 253, X1: 508, Y1: 266}, Baseline: 263, Em: 13},
+		{Box: translation.Rect{X0: 20, Y0: 273, X1: 270, Y1: 286}, Baseline: 283, Em: 13},
 	}
-	// A translucent black glyph over white stays light grey, never full black.
-	var darkest uint8 = 255
-	left, top := int(pos.X), int(pos.Y)
-	for y := top - 6; y < top+24; y++ {
-		for x := left - 4; x < left+200; x++ {
-			if x < 0 || y < 0 || x >= 600 || y >= 300 {
-				continue
-			}
-			if v := tt.Image().RGBAAt(x, y).R; v < darkest {
-				darkest = v
+	r := region("付费 IP 范围内的地址不保证可从其访问任何网站或服务，也不保证 IP 的地理位置信息（例如 GeoIP 数据库显示的国家或地区）。", translation.AlignLeft, lines...)
+	placed := layoutRegions([]translation.Region{r}, 1)
+	if len(placed) == 0 || len(placed) > 3 {
+		t.Fatalf("the translation must fit the source's lines: %d", len(placed))
+	}
+	for i, p := range placed {
+		if p.x != 20 {
+			t.Fatalf("line %d does not start at the paragraph's left edge: %.1f", i, p.x)
+		}
+		if w, _ := p.layout.Size(); p.x+w > 520+7 {
+			t.Fatalf("line %d runs past the paragraph: %.1f", i, p.x+w)
+		}
+		middle := p.y + translationInkCenter*13
+		if want := float32(lines[i].Baseline - latinCenter*13); middle < want-1.5 || middle > want+1.5 {
+			t.Fatalf("line %d middle %.1f, want %.1f", i, middle, want)
+		}
+	}
+}
+
+func TestLayoutShrinksALabelThatWouldWrap(t *testing.T) {
+	r := region("这是一个比原文长得多的中文翻译标签", translation.AlignLeft, translation.Line{Box: translation.Rect{X0: 10, Y0: 10, X1: 120, Y1: 22}, Baseline: 22, Em: 13})
+	r.MaxX = 190
+	placed := layoutRegions([]translation.Region{r}, 1)
+	if len(placed) == 1 {
+		if w, _ := placed[0].layout.Size(); w > 181 {
+			t.Fatalf("a single line must fit up to the neighbour: %.1f", w)
+		}
+	} else if len(placed) > 2 {
+		t.Fatalf("too many lines: %d", len(placed))
+	}
+}
+
+func TestLayoutConvertsPixelsToDIPs(t *testing.T) {
+	r := region("价格", translation.AlignLeft, translation.Line{Box: translation.Rect{X0: 20, Y0: 250, X1: 76, Y1: 268}, Baseline: 268, Em: 26})
+	placed := layoutRegions([]translation.Region{r}, 2)
+	if placed[0].x != 10 {
+		t.Fatalf("x %.1f, want 10 DIPs at 200%%", placed[0].x)
+	}
+}
+
+func TestTranslationOverlayShowsTheSourceWhileTranslating(t *testing.T) {
+	img := solidRGBA(400, 200, color.RGBA{200, 30, 30, 255})
+	o := &translationOverlay{image: img, scale: 1, status: "正在翻译…", source: ui.NewBitmap(img)}
+	tt := ui.NewTester(o.view, 400, 200)
+	if !tt.HasText("正在翻译…") {
+		t.Fatal("progress label missing")
+	}
+	// Away from the scan band and the label the screenshot shows as it was.
+	im := tt.Image()
+	if p := im.RGBAAt(20, 20); p.R < 150 || p.G > 90 {
+		if p2 := im.RGBAAt(380, 100); p2.R < 150 || p2.G > 90 {
+			t.Fatalf("the source must show through while waiting: %+v %+v", p, p2)
+		}
+	}
+}
+
+func TestTranslationOverlayDrawsTheResult(t *testing.T) {
+	img := solidRGBA(400, 200, color.RGBA{255, 255, 255, 255})
+	erased := solidRGBA(400, 200, color.RGBA{240, 246, 255, 255})
+	r := region("你好世界", translation.AlignLeft, translation.Line{Box: translation.Rect{X0: 40, Y0: 80, X1: 160, Y1: 100}, Baseline: 100, Em: 20})
+	r.Color = color.RGBA{A: 255}
+	o := &translationOverlay{image: img, scale: 1, source: ui.NewBitmap(img)}
+	o.result = ui.NewBitmap(erased)
+	o.lines = layoutRegions([]translation.Region{r}, 1)
+	im := ui.NewTester(o.view, 400, 200).Image()
+	if p := im.RGBAAt(300, 160); p.R != 240 || p.G != 246 || p.B != 255 {
+		t.Fatalf("the erased screenshot must be the backdrop: %+v", p)
+	}
+	dark := 0
+	for y := 75; y < 105; y++ {
+		for x := 40; x < 130; x++ {
+			if im.RGBAAt(x, y).R < 100 {
+				dark++
 			}
 		}
 	}
-	if darkest < 120 || darkest > 245 {
-		t.Fatalf("waiting text must be semi-transparent black, darkest R=%d", darkest)
+	if dark < 40 {
+		t.Fatalf("translation not drawn where the source was: %d dark pixels", dark)
+	}
+}
+
+func TestTranslationOverlayListsBlocksItCouldNotPlace(t *testing.T) {
+	img := solidRGBA(400, 200, color.RGBA{255, 255, 255, 255})
+	o := &translationOverlay{image: img, scale: 1, source: ui.NewBitmap(img), reader: []translation.Block{
+		{Src: "Upgrade", Text: "升级", Bold: true}, {Src: "Cancel", Text: "取消"},
+	}}
+	tt := ui.NewTester(o.view, 400, 200)
+	if !tt.HasText("升级") || !tt.HasText("取消") {
+		t.Fatal("the fallback must list every block")
+	}
+}
+
+func TestTranslationOverlayReportsFailure(t *testing.T) {
+	img := solidRGBA(400, 200, color.RGBA{255, 255, 255, 255})
+	o := &translationOverlay{image: img, scale: 1, source: ui.NewBitmap(img), status: "翻译未完成：网络错误", failed: true}
+	if !ui.NewTester(o.view, 400, 200).HasText("翻译未完成：网络错误 · Esc 关闭") {
+		t.Fatal("error label missing")
+	}
+}
+
+func TestTranslationOverlayHasTwoPixelBorder(t *testing.T) {
+	img := solidRGBA(400, 200, color.RGBA{255, 255, 255, 255})
+	o := &translationOverlay{image: img, scale: 1, source: ui.NewBitmap(img), result: ui.NewBitmap(img)}
+	im := ui.NewTester(o.view, 400, 200).Image()
+	for _, pt := range []image.Point{{0, 100}, {1, 100}, {398, 100}, {399, 100}, {200, 0}, {200, 1}, {200, 198}, {200, 199}} {
+		if p := im.RGBAAt(pt.X, pt.Y); p.R > 200 {
+			t.Fatalf("border missing at %v: %+v", pt, p)
+		}
+	}
+	if p := im.RGBAAt(3, 100); p.R < 240 || p.G < 240 || p.B < 240 {
+		t.Fatalf("inside the border the screenshot shows: %+v", p)
 	}
 }
 
@@ -112,64 +210,6 @@ func TestTranslationCopiesAreWritten(t *testing.T) {
 	}
 }
 
-func TestTranslationLightTextStaysVisible(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 400, 100))
-	line := translation.Line{Text: "白色原文", X: 0.1, Y: 0.2, W: 0.6, H: 0.4, Color: "#ffffff"}
-	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{line}}
-	tt := ui.NewTester(o.view, 400, 100)
-	pos, ok := tt.Find(line.Text)
-	if !ok {
-		t.Fatal("translated line missing")
-	}
-	dark := 0
-	for y := int(pos.Y); y < int(pos.Y+pos.H); y++ {
-		for x := int(pos.X); x < int(pos.X+pos.W); x++ {
-			if x < 0 || y < 0 || x >= 400 || y >= 100 {
-				continue
-			}
-			if tt.Image().RGBAAt(x, y).R < 120 {
-				dark++
-			}
-		}
-	}
-	if dark < 20 {
-		t.Fatalf("white source text is invisible on the white overlay (dark pixels: %d)", dark)
-	}
-}
-
-func leftmostDark(tt *ui.Tester, y0, y1, width int) int {
-	best := width
-	for y := y0; y < y1; y++ {
-		for x := 0; x < width; x++ {
-			if tt.Image().RGBAAt(x, y).R < 120 && x < best {
-				best = x
-			}
-		}
-	}
-	return best
-}
-
-func TestTranslationCentersLinesThatWereCentered(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 600, 200))
-	line := translation.Line{Text: "中间标题", X: 0.3, Y: 0.4, W: 0.4, H: 0.15, Color: "#000000"}
-	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{line}}
-	tt := ui.NewTester(o.view, 600, 200)
-	left := leftmostDark(tt, 80, 110, 600)
-	if left < 240 {
-		t.Fatalf("centered line should not start at the box edge: leftmost pixel %d", left)
-	}
-}
-
-func TestTranslationKeepsLeftAlignedLinesAtTheLeft(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 600, 200))
-	line := translation.Line{Text: "左对齐正文", X: 0.05, Y: 0.4, W: 0.4, H: 0.15, Color: "#000000"}
-	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{line}}
-	tt := ui.NewTester(o.view, 600, 200)
-	if left := leftmostDark(tt, 80, 110, 600); left > 50 {
-		t.Fatalf("left aligned line moved away from its box: leftmost pixel %d", left)
-	}
-}
-
 func TestModelImageCapsPixels(t *testing.T) {
 	big := image.NewRGBA(image.Rect(0, 0, 3840, 2160))
 	resized := modelImage(big)
@@ -185,20 +225,12 @@ func TestModelImageCapsPixels(t *testing.T) {
 	}
 }
 
-func TestTranslationOverlayHasTwoPixelBorder(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 400, 200))
-	o := &translationOverlay{image: img, scale: 1, lines: []translation.Line{
-		{Text: "你好", X: 0.1, Y: 0.2, W: 0.3, H: 0.1, Color: "#000000"},
-	}}
-	tt := ui.NewTester(o.view, 400, 200)
-	im := tt.Image()
-	for _, pt := range []image.Point{{0, 100}, {1, 100}, {398, 100}, {399, 100}, {200, 0}, {200, 1}, {200, 198}, {200, 199}} {
-		if p := im.RGBAAt(pt.X, pt.Y); p.R > 200 {
-			t.Fatalf("border missing at %v: %+v", pt, p)
+func solidRGBA(w, h int, c color.RGBA) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.SetRGBA(x, y, c)
 		}
 	}
-	// Just inside the border the sheet is white again.
-	if p := im.RGBAAt(3, 100); p.R < 240 || p.G < 240 || p.B < 240 {
-		t.Fatalf("inner area must stay white: %+v", p)
-	}
+	return img
 }
