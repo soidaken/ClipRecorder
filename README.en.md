@@ -35,7 +35,7 @@ After selecting a region the toolbar offers three annotation tools, all off by d
 
 A confirmed shot gets rounded corners and a soft drop shadow: the capture is inset, the padding around it stays fully transparent (PNG keeps its alpha) and only a downward shadow is drawn, so it floats on any page without a coloured plate. Turn it off with the square icon in the toolbar to copy the raw 1:1 shot.
 
-Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\`, and puts **only the image** (PNG + DIB) on the clipboard, so WPS/Excel cells and chat windows paste a picture. Tick "复制路径" in the toolbar (off by default) to also carry the file and its absolute path — note that apps which see text will then often paste the path instead of the image.
+Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\`. "复制路径" in the toolbar is ticked by default: the clipboard then carries the image (PNG + DIB), the file and its absolute path as text, so chat and office apps take the picture or the file and text-only inputs (a terminal, say) get the path. A few apps, such as WPS/Excel cells, paste the path whenever text is present; untick it there to copy only the image. The clipboard is handed over to the system in full right after confirming, so pasting keeps working even if ClipRecorder is busy or has exited.
 
 Annotations are included in the copied image. The bottom-left hint cancels with `Esc`. Once a region is chosen, clicking outside it does nothing; press `Esc` and select again to change it. Dragging from inside the region redraws it and clears the annotations.
 

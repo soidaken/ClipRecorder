@@ -200,9 +200,9 @@ func cardButton(c *ui.Context, on bool) ui.Element {
 	return b
 }
 
-// pathCheckbox is the small "复制路径" toggle of the shot toolbar: unchecked by
-// default, because text on the clipboard makes apps like WPS paste the path
-// instead of the picture.
+// pathCheckbox is the small "复制路径" toggle of the shot toolbar. It starts
+// ticked, so text-only inputs get the path; untick it for apps like WPS that
+// paste the path instead of the picture whenever text is on the clipboard.
 func pathCheckbox(c *ui.Context, checked *bool) {
 	row := ui.CheckboxBase(c, checked).Height(32).Gap(6).Padding(0, 9).
 		Radius(8).Cursor(ui.CursorPointer).FocusRing(false).Shrink(0).Label("复制路径")

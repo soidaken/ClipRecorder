@@ -79,6 +79,14 @@ func decorateShot(src image.Image) *image.RGBA {
 // smoothly instead of stepping pixel by pixel.
 func roundRectCoverage(r image.Rectangle, radius float32, x, y int) float32 {
 	const samples = 4
+	// The distance changes by at most 1 per pixel moved, and every sample lies
+	// within 0.53px of the pixel centre: pixels further than that from the edge
+	// are fully in or out, which is almost all of them.
+	if d := roundRectSDF(float32(x)+0.5, float32(y)+0.5, r, radius); d <= -0.75 {
+		return 1
+	} else if d >= 0.75 {
+		return 0
+	}
 	var inside int
 	for sy := 0; sy < samples; sy++ {
 		for sx := 0; sx < samples; sx++ {
@@ -101,9 +109,9 @@ func shadowAt(shadow *image.RGBA, x, y int) float32 {
 }
 
 // prepareCopy applies the copy resolution and, when enabled, the card look.
-func (s *selection) prepareCopy(img image.Image) image.Image {
-	out := s.quality.resizeCopy(img)
-	if s.card {
+func prepareCopy(img image.Image, quality shotQuality, card bool) image.Image {
+	out := quality.resizeCopy(img)
+	if card {
 		return decorateShot(out)
 	}
 	return out

@@ -139,7 +139,7 @@ func (a *app) beginSelection(record, translate bool) {
 		a.notify("截图失败", err.Error())
 		return
 	}
-	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true}
+	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true, copyPath: true}
 	a.selection = s
 	s.window = mygo.NewWindow(mygo.WindowOptions{
 		Title: "ClipRecorder · 选择区域", Content: ui.View(s.view), Hidden: true,

@@ -70,17 +70,17 @@ func TestShotCardFloatsWithShadowOnly(t *testing.T) {
 func TestPrepareCopyHonoursCardToggle(t *testing.T) {
 	src := solidShot(800, 600, color.RGBA{10, 10, 200, 255})
 	s := &selection{quality: qualityMedium, card: true}
-	if got := s.prepareCopy(src).Bounds().Dx(); got <= 800 {
+	if got := prepareCopy(src, s.quality, s.card).Bounds().Dx(); got <= 800 {
 		t.Fatalf("card must pad the copy: %d", got)
 	}
 	s.card = false
-	if got := s.prepareCopy(src).Bounds().Dx(); got != 800 {
+	if got := prepareCopy(src, s.quality, s.card).Bounds().Dx(); got != 800 {
 		t.Fatalf("without the card the copy must stay 1:1: %d", got)
 	}
 	s.quality = qualityLow
 	s.card = true
 	wide := solidShot(3000, 1000, color.RGBA{10, 10, 200, 255})
-	out := s.prepareCopy(wide).Bounds()
+	out := prepareCopy(wide, s.quality, s.card).Bounds()
 	if out.Dx() <= lowQualityLongestSide || out.Dx() > lowQualityLongestSide+2*cardPaddingMax {
 		t.Fatalf("low quality card size: %v", out)
 	}
@@ -169,5 +169,26 @@ func TestRoundedCornersSurvivePNGRoundTrip(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("checked no edge pixels")
+	}
+}
+
+// The early in/out answer must agree with supersampling every pixel.
+func TestRoundRectCoverageShortcutMatchesSampling(t *testing.T) {
+	r := image.Rect(7, 5, 140, 90)
+	const radius = 13.5
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 150; x++ {
+			inside := 0
+			for sy := 0; sy < 4; sy++ {
+				for sx := 0; sx < 4; sx++ {
+					if roundRectSDF(float32(x)+(float32(sx)+0.5)/4, float32(y)+(float32(sy)+0.5)/4, r, radius) <= 0 {
+						inside++
+					}
+				}
+			}
+			if got, want := roundRectCoverage(r, radius, x, y), float32(inside)/16; got != want {
+				t.Fatalf("coverage at %d,%d: got %v want %v", x, y, got, want)
+			}
+		}
 	}
 }

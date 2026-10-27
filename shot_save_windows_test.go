@@ -117,21 +117,19 @@ func TestShotClipboardCarriesImageFileAndPath(t *testing.T) {
 	}
 }
 
-func TestCopyPathCheckboxDefaultsOff(t *testing.T) {
+func TestCopyPathCheckboxUnticks(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 900, 600))
+	// beginSelection starts every shot with the path ticked.
 	s := &selection{desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
-		selected: true, rect: ui.Rect{X: 60, Y: 40, W: 700, H: 400}, quality: qualityMedium, card: true}
+		selected: true, rect: ui.Rect{X: 60, Y: 40, W: 700, H: 400}, quality: qualityMedium, card: true, copyPath: true}
 	tt := ui.NewTester(s.view, 900, 600)
-	if s.copyPath {
-		t.Fatal("copying the path must be off by default")
-	}
 	if !tt.HasText("复制路径") {
 		t.Fatal("path checkbox missing from the toolbar")
 	}
 	if err := tt.Click("复制路径"); err != nil {
 		t.Fatal(err)
 	}
-	if !s.copyPath {
-		t.Fatalf("checkbox did not toggle, copyPath=%v", s.copyPath)
+	if s.copyPath {
+		t.Fatalf("checkbox did not untick, copyPath=%v", s.copyPath)
 	}
 }

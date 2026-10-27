@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cliprecorder/internal/capture"
 	"cliprecorder/internal/recording"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -414,8 +415,11 @@ func (s *selection) copyAnnotated(rect image.Rectangle) {
 }
 
 func (s *selection) copyImage(img image.Image) {
-	copied := s.prepareCopy(img)
+	// The card look of a large shot takes a moment, so it runs with the
+	// encoding off the main thread: the UI stays responsive meanwhile.
+	quality, card, copyPath := s.quality, s.card, s.copyPath
 	go func() {
+		copied := prepareCopy(img, quality, card)
 		var out bytes.Buffer
 		if err := png.Encode(&out, copied); err != nil {
 			s.app.notify("截图复制失败", err.Error())
@@ -427,11 +431,19 @@ func (s *selection) copyImage(img image.Image) {
 			path, err := saveShot(pngBytes)
 			if err != nil {
 				s.app.notify("截图保存失败", err.Error())
-			} else if s.copyPath {
+			} else if copyPath {
 				data = shotClipboard(pngBytes, path)
 			}
 		}
 		if err := mygo.Clipboard.Write(data); err != nil {
+			s.app.notify("截图复制失败", err.Error())
+			return
+		}
+		// Hand every format over to the system right away. Left to delayed
+		// rendering, each paste had to be answered by this process's main
+		// thread, and came out empty whenever that thread was busy or the
+		// process had exited.
+		if err := mygo.Clipboard.Flush(); err != nil && !errors.Is(err, mygo.ErrClipboardChanged) {
 			s.app.notify("截图复制失败", err.Error())
 		}
 	}()
