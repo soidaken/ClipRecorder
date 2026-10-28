@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"cliprecorder/internal/capture"
 	"cliprecorder/internal/recording"
-	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -426,24 +424,18 @@ func (s *selection) copyImage(img image.Image) {
 			return
 		}
 		pngBytes := out.Bytes()
-		data := shotClipboard(pngBytes, "")
+		path := ""
 		if s.app != nil && s.app.shotSaveFile {
-			path, err := saveShot(pngBytes)
-			if err != nil {
+			if saved, err := saveShot(pngBytes); err != nil {
 				s.app.notify("截图保存失败", err.Error())
-			} else if copyPath {
-				data = shotClipboard(pngBytes, path)
+			} else {
+				path = saved
 			}
 		}
-		if err := mygo.Clipboard.Write(data); err != nil {
-			s.app.notify("截图复制失败", err.Error())
-			return
+		if !copyPath {
+			path = ""
 		}
-		// Hand every format over to the system right away. Left to delayed
-		// rendering, each paste had to be answered by this process's main
-		// thread, and came out empty whenever that thread was busy or the
-		// process had exited.
-		if err := mygo.Clipboard.Flush(); err != nil && !errors.Is(err, mygo.ErrClipboardChanged) {
+		if err := copyShotToClipboard(copied, pngBytes, path); err != nil {
 			s.app.notify("截图复制失败", err.Error())
 		}
 	}()
@@ -466,23 +458,6 @@ func saveShot(pngBytes []byte) (string, error) {
 	}
 	path := filepath.Join(dir, "shot_"+time.Now().Format("20060102_150405.000")+".png")
 	return path, os.WriteFile(path, pngBytes, 0o644)
-}
-
-// shotClipboard carries the image; with a path it also carries the file and
-// that absolute path. Image-only is the default because apps that see text
-// next to a bitmap paste the text (WPS cells, for one), while an image-only
-// payload is pasted as a picture everywhere.
-func shotClipboard(pngBytes []byte, path string) transfer.Data {
-	item := transfer.NewItem(transfer.Bytes(transfer.PNG, pngBytes))
-	if path == "" {
-		return transfer.New(item)
-	}
-	return transfer.New(transfer.NewItem(
-		transfer.Bytes(transfer.PNG, pngBytes),
-		transfer.Bytes(transfer.Text, []byte(path)),
-		transfer.Bytes(transfer.FileList, []byte(fileURI(path))),
-		transfer.Bytes(transfer.URIList, []byte(fileURI(path))),
-	))
 }
 
 // fileURI renders an absolute path as the file URL the clipboard formats use.

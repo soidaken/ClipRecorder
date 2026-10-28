@@ -145,7 +145,7 @@ func (a *app) beginSelection(record, translate bool) {
 		a.notify("截图失败", err.Error())
 		return
 	}
-	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true, copyPath: true}
+	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true}
 	a.selection = s
 	s.window = mygo.NewWindow(mygo.WindowOptions{
 		Title: "ClipRecorder · 选择区域", Content: ui.View(s.view), Hidden: true,
@@ -206,7 +206,9 @@ func (a *app) record(rect image.Rectangle, options recording.Options) {
 				a.notify("录屏已保存", path)
 				// The saved file's absolute path goes to the clipboard, so it can
 				// be pasted straight into a chat or a terminal.
-				mygo.Clipboard.WriteText(path)
+				if clipErr := copyTextToClipboard(path); clipErr != nil {
+					log.Print("复制录屏路径失败: ", clipErr)
+				}
 				if openErr := mygo.Shell.OpenPath(filepath.Dir(path)); openErr != nil {
 					a.notify("打开存放目录失败", fmt.Sprintf("文件已保存至 %s：%v", path, openErr))
 				}
