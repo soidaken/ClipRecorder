@@ -41,6 +41,8 @@ Annotations are included in the copied image. The bottom-left hint cancels with 
 
 The 低 / 中 / 高 (low / medium / high) segments set the copied resolution: low caps the longest side at 1280 px, medium (default) and high copy at the screen's physical pixels, 1:1. The clipboard only carries lossless PNG, so medium and high are the sharpest possible.
 
+The recording bar takes a screen corner that the recorded region does not cover (bottom right first, then top right, bottom left, top left), so it needs no capture protection and shows up in remote desktop and screen sharing too; only a region covering the whole screen hides it.
+
 Recordings are saved to `%USERPROFILE%\Videos\ClipRecorder\`; when a recording finishes, its absolute path is copied to the clipboard.
 
 The first translation asks for a DeepSeek API key, which is then encrypted with Windows DPAPI and stored locally (`%APPDATA%\ClipRecorder\deepseek-key.dat`). The selected screenshot is sent to DeepSeek as JPEG for recognition and translation.

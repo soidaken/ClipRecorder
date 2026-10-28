@@ -183,8 +183,12 @@ func (a *app) record(rect image.Rectangle, options recording.Options) {
 		// stay fully transparent instead of showing the window background.
 		Transparent: true,
 	})
-	j.window.SetContentProtection(true)
-	placeRecordingBar(j.window, rect)
+	// Only hide the bar from captures when it sits inside the recorded region:
+	// content protection also hides it from remote desktop and screen sharing,
+	// so it is worth avoiding.
+	if bar := placeRecordingBar(j.window, rect); bar.Overlaps(rect) {
+		j.window.SetContentProtection(true)
+	}
 	j.window.OnClose(func(e *mygo.CloseEvent) { e.PreventDefault(); a.stop() })
 	j.window.ShowInactive()
 	go func() {
