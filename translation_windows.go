@@ -29,7 +29,7 @@ type keyDialog struct {
 }
 
 func (a *app) beginTranslate() {
-	if a.selection != nil || a.job != nil {
+	if a.selection != nil {
 		return
 	}
 	if a.keyDialog != nil {

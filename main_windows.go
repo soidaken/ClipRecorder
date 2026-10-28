@@ -129,7 +129,13 @@ func (a *app) begin(record bool) {
 }
 
 func (a *app) beginSelection(record, translate bool) {
-	if a.selection != nil || a.job != nil || a.keyDialog != nil {
+	if a.selection != nil || a.keyDialog != nil {
+		return
+	}
+	// Screenshots and translation work during a recording; only a second
+	// recording has to wait.
+	if record && a.job != nil {
+		a.notify("正在录制", "请先停止当前录制（Ctrl+Shift+T）再开始新的录制")
 		return
 	}
 	a.closeTranslation()
