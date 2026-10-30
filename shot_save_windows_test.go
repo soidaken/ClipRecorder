@@ -48,12 +48,12 @@ func TestSaveShotWritesFile(t *testing.T) {
 	}
 }
 
-func TestImageToDIBLayout(t *testing.T) {
+func TestImageToDIBIsOpaqueAndFlipped(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
 	img.SetRGBA(0, 0, color.RGBA{255, 0, 0, 255})
 	img.SetRGBA(1, 0, color.RGBA{0, 255, 0, 255})
 	img.SetRGBA(0, 1, color.RGBA{0, 0, 255, 255})
-	img.SetRGBA(1, 1, color.RGBA{255, 255, 255, 128})
+	img.SetRGBA(1, 1, color.RGBA{0, 0, 0, 0}) // fully transparent
 	dib := imageToDIB(img)
 	if len(dib) != 40+2*2*4 {
 		t.Fatalf("dib size: %d", len(dib))
@@ -72,8 +72,16 @@ func TestImageToDIBLayout(t *testing.T) {
 	if bottom[0] != 255 || bottom[1] != 0 || bottom[2] != 0 {
 		t.Fatalf("first row should hold the bottom-left blue pixel: %v", bottom[:4])
 	}
-	if dib[40+7] != 128 {
-		t.Fatalf("alpha not carried: %v", dib[40:48])
+	// Transparent pixels are flattened onto white and every alpha byte is
+	// opaque: apps that ignore the alpha channel must never see black.
+	transparent := dib[40+1*4:]
+	if transparent[0] != 255 || transparent[1] != 255 || transparent[2] != 255 || transparent[3] != 255 {
+		t.Fatalf("transparent pixel should flatten to opaque white: %v", transparent[:4])
+	}
+	for i := 43; i < len(dib); i += 4 {
+		if dib[i] != 255 {
+			t.Fatalf("alpha byte %d is not opaque", i)
+		}
 	}
 }
 

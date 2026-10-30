@@ -157,32 +157,28 @@ func imageToDIB(img image.Image) []byte {
 	put(14, 32)       // biBitCount
 	for y := 0; y < h; y++ {
 		row := out[40+(h-1-y)*w*4:]
-		switch src := img.(type) {
-		case *image.RGBA:
-			// Premultiplied: undo it for every pixel that is not opaque.
-			pix := src.Pix[src.PixOffset(b.Min.X, b.Min.Y+y):]
-			for x := 0; x < w; x++ {
-				r, g, bb, a := pix[x*4], pix[x*4+1], pix[x*4+2], pix[x*4+3]
-				if a != 0xff && a != 0 {
-					r = uint8(min(uint32(r)*0xff/uint32(a), 0xff))
-					g = uint8(min(uint32(g)*0xff/uint32(a), 0xff))
-					bb = uint8(min(uint32(bb)*0xff/uint32(a), 0xff))
-				}
-				row[x*4], row[x*4+1], row[x*4+2], row[x*4+3] = bb, g, r, a
-			}
-		case *image.NRGBA:
-			pix := src.Pix[src.PixOffset(b.Min.X, b.Min.Y+y):]
-			for x := 0; x < w; x++ {
-				row[x*4], row[x*4+1], row[x*4+2], row[x*4+3] = pix[x*4+2], pix[x*4+1], pix[x*4], pix[x*4+3]
-			}
-		default:
-			for x := 0; x < w; x++ {
-				c := color.NRGBAModel.Convert(img.At(b.Min.X+x, b.Min.Y+y)).(color.NRGBA)
-				row[x*4], row[x*4+1], row[x*4+2], row[x*4+3] = c.B, c.G, c.R, c.A
-			}
+		for x := 0; x < w; x++ {
+			c := color.NRGBAModel.Convert(img.At(b.Min.X+x, b.Min.Y+y)).(color.NRGBA)
+			// A 32-bit DIB carries alpha, but plenty of apps ignore it and show
+			// whatever RGB sits there, which made the transparent card margins
+			// come out black. The bitmap is flattened onto white instead, while
+			// the PNG representation keeps the transparency.
+			r, g, bb := flattenOnWhite(c)
+			row[x*4], row[x*4+1], row[x*4+2], row[x*4+3] = bb, g, r, 255
 		}
 	}
 	return out
+}
+
+// flattenOnWhite blends a straight-alpha colour over an opaque white backdrop.
+func flattenOnWhite(c color.NRGBA) (uint8, uint8, uint8) {
+	if c.A == 255 {
+		return c.R, c.G, c.B
+	}
+	mix := func(v uint8) uint8 {
+		return uint8((uint32(v)*uint32(c.A) + 255*uint32(255-c.A)) / 255)
+	}
+	return mix(c.R), mix(c.G), mix(c.B)
 }
 
 func utf16Bytes(s string) []byte {

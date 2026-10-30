@@ -22,7 +22,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 | `Ctrl+Shift+T` / "Stop" on the floating bar | Stop and save the recording |
 | `Esc` / right click | Cancel the selection |
 
-The tray menu offers the same actions and toggles start-at-login.
+The tray menu offers the same actions, toggles start-at-login, and switches to English input after 6 seconds without typing.
 
 ## Annotating a shot
 
@@ -39,7 +39,7 @@ Confirming also writes a PNG copy to `%USERPROFILE%\Pictures\ClipRecorder\`. "�
 
 Annotations are included in the copied image. The bottom-left hint cancels with `Esc`. Once a region is chosen, clicking outside it does nothing; press `Esc` and select again to change it. Dragging from inside the region redraws it and clears the annotations.
 
-The 低 / 中 / 高 (low / medium / high) segments set the copied resolution: low caps the longest side at 1280 px, medium (default) and high copy at the screen's physical pixels, 1:1. The clipboard only carries lossless PNG, so medium and high are the sharpest possible.
+The 低 / 中 / 高 (low / medium / high) segments set the copied resolution: low caps the longest side at 1280 px, medium (default) and high copy at the screen's physical pixels, 1:1. The clipboard carries lossless PNG, so medium and high are the sharpest possible. A bitmap copy is offered as well, with transparency flattened onto white, so older apps that ignore the alpha channel do not show a black background.
 
 The recording bar takes a screen corner that the recorded region does not cover (bottom right first, then top right, bottom left, top left), so it needs no capture protection and shows up in remote desktop and screen sharing too; only a region covering the whole screen hides it.
 

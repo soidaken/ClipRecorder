@@ -67,6 +67,8 @@ func main() {
 	})
 	mygo.App.WhenReady(func() {
 		a.shotSaveFile = true
+		imeWatch.enabled.Store(true)
+		imeWatch.install()
 		startupItem := a.autostartMenuItem()
 		menu := mygo.NewMenu([]*mygo.MenuItem{
 			{Label: "截图  ·  Ctrl+I", Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
@@ -76,6 +78,7 @@ func main() {
 			mygo.Separator(),
 			startupItem,
 			saveShotItem(a),
+			imeIdleItem(),
 			{Label: "设置 DeepSeek Key…", Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
 			mygo.Separator(),
 			{Label: "退出", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
@@ -298,6 +301,19 @@ func saveShotItem(a *app) *mygo.MenuItem {
 	item.Click = func(*mygo.MenuItem, *mygo.Window) {
 		a.shotSaveFile = !a.shotSaveFile
 		item.SetChecked(a.shotSaveFile)
+	}
+	return item
+}
+
+// imeIdleItem toggles switching to English after a pause in typing.
+func imeIdleItem() *mygo.MenuItem {
+	item := &mygo.MenuItem{Label: "6 秒无键盘输入后切换英文输入法", Checked: imeWatch.enabled.Load()}
+	item.Click = func(*mygo.MenuItem, *mygo.Window) {
+		enabled := !imeWatch.enabled.Load()
+		imeWatch.enabled.Store(enabled)
+		item.SetChecked(enabled)
+		imeWatch.lastKey.Store(time.Now().UnixNano())
+		imeWatch.done.Store(false)
 	}
 	return item
 }
