@@ -1,61 +1,43 @@
 package main
 
 import (
+	"encoding/binary"
 	"log"
 	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 // After a few seconds without keyboard input the input method is switched to
-// English, the same effect as pressing Ctrl+Space, so typing after a pause does
-// not start with half a Chinese sentence. A low level keyboard hook only
-// records the time of the last key; it never swallows anything.
+// English the same way Ctrl+Space does, so typing after a pause does not start
+// with half a Chinese sentence. A low level keyboard hook only records when the
+// last key was pressed; it never swallows anything.
 
 const (
-	imeIdleTimeout    = 6 * time.Second
-	whKeyboardLL      = 13
-	wmKeyDown         = 0x0100
-	wmSysKeyDown      = 0x0104
-	imeCmodeNative    = 0x0001
-	vkControl         = 0x11
-	vkSpace           = 0x20
-	langEnglish       = 0x0409
-	wmInputLangChange = 0x0050
-	inputKeyboard     = 1
-	keyEventKeyUp     = 0x0002
+	imeIdleTimeout = 6 * time.Second
+	whKeyboardLL   = 13
+	wmKeyDown      = 0x0100
+	wmSysKeyDown   = 0x0104
+	imeCmodeNative = 0x0001
+	vkControl      = 0x11
+	vkSpace        = 0x20
+	inputKeyboard  = 1
+	keyEventKeyUp  = 0x0002
 )
 
 var (
-	user32IME          = syscall.NewLazyDLL("user32.dll")
-	imm32              = syscall.NewLazyDLL("imm32.dll")
-	setWindowsHookEx   = user32IME.NewProc("SetWindowsHookExW")
-	callNextHookEx     = user32IME.NewProc("CallNextHookEx")
-	getForeground      = user32IME.NewProc("GetForegroundWindow")
-	sendInput          = user32IME.NewProc("SendInput")
-	immGetContext      = imm32.NewProc("ImmGetContext")
-	immReleaseContext  = imm32.NewProc("ImmReleaseContext")
-	immGetConvStatus   = imm32.NewProc("ImmGetConversionStatus")
-	immSetConvStatus   = imm32.NewProc("ImmSetConversionStatus")
-	getWindowThreadID  = user32IME.NewProc("GetWindowThreadProcessId")
-	getKeyboardLayout  = user32IME.NewProc("GetKeyboardLayout")
-	postMessage        = user32IME.NewProc("PostMessageW")
-	loadKeyboardLayout = user32IME.NewProc("LoadKeyboardLayoutW")
+	user32IME         = syscall.NewLazyDLL("user32.dll")
+	imm32             = syscall.NewLazyDLL("imm32.dll")
+	setWindowsHookEx  = user32IME.NewProc("SetWindowsHookExW")
+	callNextHookEx    = user32IME.NewProc("CallNextHookEx")
+	getForeground     = user32IME.NewProc("GetForegroundWindow")
+	sendInput         = user32IME.NewProc("SendInput")
+	immGetContext     = imm32.NewProc("ImmGetContext")
+	immReleaseContext = imm32.NewProc("ImmReleaseContext")
+	immGetConvStatus  = imm32.NewProc("ImmGetConversionStatus")
+	immSetConvStatus  = imm32.NewProc("ImmSetConversionStatus")
 )
-
-type keyboardInput struct {
-	Type  uint32
-	_     uint32
-	Vk    uint16
-	Scan  uint16
-	Flags uint32
-	Time  uint32
-	_     uint32
-	Extra uintptr
-}
 
 type imeWatcher struct {
 	enabled  atomic.Bool
@@ -74,6 +56,9 @@ var imeWatch = &imeWatcher{}
 func (w *imeWatcher) install() {
 	if w.hook != 0 {
 		return
+	}
+	if w.timeout <= 0 {
+		w.timeout = imeIdleTimeout
 	}
 	w.lastKey.Store(time.Now().UnixNano())
 	callback := syscall.NewCallback(w.keyboardProc)
@@ -114,75 +99,85 @@ func (w *imeWatcher) loop() {
 		if !w.enabled.Load() || w.done.Load() {
 			continue
 		}
-		idle := time.Since(time.Unix(0, w.lastKey.Load()))
 		timeout := w.timeout
 		if timeout <= 0 {
 			timeout = imeIdleTimeout
 		}
-		if idle < timeout {
+		if time.Since(time.Unix(0, w.lastKey.Load())) < timeout {
 			continue
 		}
-		if w.switchIME() {
-			w.done.Store(true)
+		// One attempt per idle period: a failing switch must not hammer
+		// Ctrl+Space on every tick.
+		w.done.Store(true)
+		if !w.switchIME() {
+			log.Print("切换到英文输入法失败")
 		}
 	}
 }
 
-// switchIMEToEnglish puts the focused window's input method into alphanumeric
-// mode. Standard IMEs accept ImmSetConversionStatus; others only react to the
-// Ctrl+Space shortcut, which is sent as a fallback.
+// switchIMEToEnglish puts the focused window's input method into English mode
+// by sending Ctrl+Space, the IME's own Chinese/English switch, so third-party
+// IMEs keep working instead of switching the user to the system ENG layout.
 func switchIMEToEnglish() bool {
 	hwnd, _, _ := getForeground.Call()
 	if hwnd == 0 || hwnd == ^uintptr(0) {
 		return false
 	}
-	himc, _, _ := immGetContext.Call(hwnd)
-	if himc == 0 {
-		// Windows 11's Notepad, Chrome and other Text Services apps have no IMM
-		// context; switching their keyboard layout to English is the reliable
-		// equivalent there.
-		return switchLayoutToEnglish(hwnd)
+	// With an IMM context the current mode can be read: an IME that is already
+	// in English would be toggled back to Chinese by Ctrl+Space, so leave it.
+	conversion, convOK := imeConversion(hwnd)
+	if convOK && conversion&imeCmodeNative == 0 {
+		return true
 	}
-	defer immReleaseContext.Call(hwnd, himc)
-
-	var conversion, sentence uint32
-	ok, _, _ := immGetConvStatus.Call(himc, uintptr(unsafe.Pointer(&conversion)), uintptr(unsafe.Pointer(&sentence)))
-	if ok == 0 || conversion&imeCmodeNative == 0 {
-		return conversion&imeCmodeNative == 0 && ok != 0
-	}
-	if res, _, _ := immSetConvStatus.Call(himc, uintptr(conversion&^imeCmodeNative), uintptr(sentence)); res != 0 {
-		var now uint32
-		if ok, _, _ := immGetConvStatus.Call(himc, uintptr(unsafe.Pointer(&now)), uintptr(unsafe.Pointer(&sentence))); ok != 0 && now&imeCmodeNative == 0 {
-			return true
+	sent := sendCtrlSpace()
+	if !sent {
+		// Some IMEs only accept the API. Fall back to it when they report a
+		// context of their own.
+		if himc, _, _ := immGetContext.Call(hwnd); himc != 0 {
+			defer immReleaseContext.Call(hwnd, himc)
+			var conversion, sentence uint32
+			if ok, _, _ := immGetConvStatus.Call(himc, uintptr(unsafe.Pointer(&conversion)), uintptr(unsafe.Pointer(&sentence))); ok != 0 {
+				if res, _, _ := immSetConvStatus.Call(himc, uintptr(conversion&^imeCmodeNative), uintptr(sentence)); res != 0 {
+					return true
+				}
+			}
 		}
-	}
-	return sendCtrlSpace()
-}
-
-// switchLayoutToEnglish posts an input language change to the window, using the
-// installed English layout when there is one.
-func switchLayoutToEnglish(hwnd uintptr) bool {
-	tid, _, _ := getWindowThreadID.Call(hwnd, 0)
-	layout, _, _ := getKeyboardLayout.Call(tid)
-	if layout&0xffff == langEnglish {
-		return true // already typing English
-	}
-	english, _, _ := loadKeyboardLayout.Call(uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("00000409"))), 1)
-	if english == 0 {
 		return false
 	}
-	postMessage.Call(hwnd, wmInputLangChange, 0, english)
 	return true
+}
+
+// imeConversion reads the conversion mode of the window's input method.
+func imeConversion(hwnd uintptr) (uint32, bool) {
+	himc, _, _ := immGetContext.Call(hwnd)
+	if himc == 0 {
+		return 0, false
+	}
+	defer immReleaseContext.Call(hwnd, himc)
+	var conversion, sentence uint32
+	ok, _, _ := immGetConvStatus.Call(himc, uintptr(unsafe.Pointer(&conversion)), uintptr(unsafe.Pointer(&sentence)))
+	return conversion, ok != 0
+}
+
+// keyboardInputBytes builds a 40 byte INPUT for one keyboard event, the size
+// Windows expects on amd64 (type, padding, then the 32 byte union).
+func keyboardInputBytes(vk uint16, flags uint32) [40]byte {
+	var b [40]byte
+	binary.LittleEndian.PutUint32(b[0:], inputKeyboard)
+	binary.LittleEndian.PutUint16(b[8:], vk)
+	binary.LittleEndian.PutUint16(b[10:], vk)
+	binary.LittleEndian.PutUint32(b[12:], flags)
+	return b
 }
 
 func sendCtrlSpace() bool {
 	imeWatch.injected.Store(true)
 	defer imeWatch.injected.Store(false)
-	inputs := []keyboardInput{
-		{Type: inputKeyboard, Vk: vkControl},
-		{Type: inputKeyboard, Vk: vkSpace},
-		{Type: inputKeyboard, Vk: vkSpace, Flags: keyEventKeyUp},
-		{Type: inputKeyboard, Vk: vkControl, Flags: keyEventKeyUp},
+	inputs := []struct{ raw [40]byte }{
+		{keyboardInputBytes(vkControl, 0)},
+		{keyboardInputBytes(vkSpace, 0)},
+		{keyboardInputBytes(vkSpace, keyEventKeyUp)},
+		{keyboardInputBytes(vkControl, keyEventKeyUp)},
 	}
 	sent, _, _ := sendInput.Call(uintptr(len(inputs)), uintptr(unsafe.Pointer(&inputs[0])), unsafe.Sizeof(inputs[0]))
 	return sent == uintptr(len(inputs))

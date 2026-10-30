@@ -22,7 +22,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 | `Ctrl+Shift+T` / "Stop" on the floating bar | Stop and save the recording |
 | `Esc` / right click | Cancel the selection |
 
-The tray menu offers the same actions, toggles start-at-login, and switches to English input after 6 seconds without typing.
+The tray menu offers the same actions, toggles start-at-login, and switches to English input after 6 seconds without typing (it sends Ctrl+Space, so the installed IME switches to English instead of the system ENG layout).
 
 ## Annotating a shot
 
