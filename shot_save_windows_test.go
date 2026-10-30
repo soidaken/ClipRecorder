@@ -162,3 +162,44 @@ func toNRGBA(src *image.RGBA) *image.NRGBA {
 	}
 	return out
 }
+
+func TestSaveShotAlsoCopiesToDownloads(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, "Downloads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, 6, 6))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	path, err := saveShot(buf.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(path, filepath.Join("Pictures", "ClipRecorder")) {
+		t.Fatalf("primary copy location: %s", path)
+	}
+	download := filepath.Join(home, "Downloads", filepath.Base(path))
+	copied, err := os.ReadFile(download)
+	if err != nil {
+		t.Fatalf("downloads copy missing: %v", err)
+	}
+	if !bytes.Equal(copied, buf.Bytes()) {
+		t.Fatal("downloads copy differs from the saved shot")
+	}
+}
+
+func TestSaveShotSkipsMissingDownloadsFolder(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("HOME", home)
+	img := image.NewRGBA(image.Rect(0, 0, 6, 6))
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	if _, err := saveShot(buf.Bytes()); err != nil {
+		t.Fatalf("missing Downloads must not fail the save: %v", err)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"log"
 	"math"
 	"net/url"
 	"os"
@@ -451,13 +452,32 @@ func shotDir() (string, error) {
 	return dir, os.MkdirAll(dir, 0o755)
 }
 
+// saveShot writes the finished shot to the app's folder and keeps an extra
+// copy in Downloads, where people look for files they just captured. The
+// returned path is the app's own copy.
 func saveShot(pngBytes []byte) (string, error) {
 	dir, err := shotDir()
 	if err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, "shot_"+time.Now().Format("20060102_150405.000")+".png")
-	return path, os.WriteFile(path, pngBytes, 0o644)
+	name := "shot_" + time.Now().Format("20060102_150405.000") + ".png"
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, pngBytes, 0o644); err != nil {
+		return "", err
+	}
+	if downloads, err := os.UserHomeDir(); err == nil {
+		if dir := filepath.Join(downloads, "Downloads"); dirExists(dir) {
+			if writeErr := os.WriteFile(filepath.Join(dir, name), pngBytes, 0o644); writeErr != nil {
+				log.Print("保存截图到下载目录失败: ", writeErr)
+			}
+		}
+	}
+	return path, nil
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // fileURI renders an absolute path as the file URL the clipboard formats use.
