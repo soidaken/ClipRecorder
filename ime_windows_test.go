@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -9,7 +10,7 @@ import (
 func TestIMEIdleSwitchesOnceAfterTimeout(t *testing.T) {
 	var switches atomic.Int32
 	w := &imeWatcher{timeout: 60 * time.Millisecond}
-	w.switchIME = func() bool {
+	w.switchIME = func(context.Context) bool {
 		switches.Add(1)
 		return true
 	}
@@ -35,7 +36,7 @@ func TestIMEIdleSwitchesOnceAfterTimeout(t *testing.T) {
 func TestIMEIdleResetsOnKeyboardInput(t *testing.T) {
 	var switches atomic.Int32
 	w := &imeWatcher{timeout: 80 * time.Millisecond}
-	w.switchIME = func() bool {
+	w.switchIME = func(context.Context) bool {
 		switches.Add(1)
 		return true
 	}
@@ -61,7 +62,7 @@ func TestIMEIdleResetsOnKeyboardInput(t *testing.T) {
 func TestIMEIdleDoesNotSwitchWhenDisabled(t *testing.T) {
 	var switches atomic.Int32
 	w := &imeWatcher{timeout: 40 * time.Millisecond}
-	w.switchIME = func() bool {
+	w.switchIME = func(context.Context) bool {
 		switches.Add(1)
 		return true
 	}
@@ -70,6 +71,25 @@ func TestIMEIdleDoesNotSwitchWhenDisabled(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	if got := switches.Load(); got != 0 {
 		t.Fatalf("disabled watcher switched: %d", got)
+	}
+}
+
+func TestIMEModeFromIndicator(t *testing.T) {
+	cases := []struct {
+		text    string
+		chinese bool
+		known   bool
+	}{
+		{"老 中 363 KB/s", true, true},
+		{"英 17:40", false, true},
+		{"17:40 2026", false, false},
+		{"", false, false},
+	}
+	for _, c := range cases {
+		chinese, known := imeModeFromIndicator(c.text)
+		if chinese != c.chinese || known != c.known {
+			t.Fatalf("imeModeFromIndicator(%q) = %v,%v want %v,%v", c.text, chinese, known, c.chinese, c.known)
+		}
 	}
 }
 

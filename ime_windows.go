@@ -1,12 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
+	"image"
 	"log"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"cliprecorder/internal/capture"
+	"cliprecorder/internal/translation"
 )
 
 // After a few seconds without keyboard input the input method is switched to
@@ -37,6 +43,12 @@ var (
 	immReleaseContext = imm32.NewProc("ImmReleaseContext")
 	immGetConvStatus  = imm32.NewProc("ImmGetConversionStatus")
 	immSetConvStatus  = imm32.NewProc("ImmSetConversionStatus")
+	getSystemMetrics  = user32IME.NewProc("GetSystemMetrics")
+)
+
+const (
+	smCxScreen = 0
+	smCyScreen = 1
 )
 
 type imeWatcher struct {
@@ -47,7 +59,7 @@ type imeWatcher struct {
 	hook     uintptr
 	// switchIME and timeout are swapped in tests; production uses the real
 	// input method switch and the six second timeout.
-	switchIME func() bool
+	switchIME func(context.Context) bool
 	timeout   time.Duration
 }
 
@@ -109,7 +121,10 @@ func (w *imeWatcher) loop() {
 		// One attempt per idle period: a failing switch must not hammer
 		// Ctrl+Space on every tick.
 		w.done.Store(true)
-		if !w.switchIME() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ok := w.switchIME(ctx)
+		cancel()
+		if !ok {
 			log.Print("切换到英文输入法失败")
 		}
 	}
@@ -118,35 +133,64 @@ func (w *imeWatcher) loop() {
 // switchIMEToEnglish puts the focused window's input method into English mode
 // by sending Ctrl+Space, the IME's own Chinese/English switch, so third-party
 // IMEs keep working instead of switching the user to the system ENG layout.
-func switchIMEToEnglish() bool {
+func switchIMEToEnglish(ctx context.Context) bool {
 	hwnd, _, _ := getForeground.Call()
 	if hwnd == 0 || hwnd == ^uintptr(0) {
 		return false
 	}
-	// Only switch when the IME itself reports Chinese mode. Ctrl+Space toggles,
-	// so sending it blind would turn English into Chinese for half of the
-	// applications, and Text Services apps (Chrome, VS Code, Windows 11
-	// Notepad) expose no mode we can read.
-	conversion, known := imeConversion(hwnd)
+	chinese, known := imeIsChinese(ctx, hwnd)
 	if !known {
+		// Ctrl+Space toggles: without knowing the current mode it could turn
+		// English back into Chinese.
 		log.Print("输入法状态不可读，跳过切换")
 		return false
 	}
-	if !imeNeedsEnglish(conversion, known) {
-		return true // already alphanumeric
-	}
-	if sendCtrlSpace() {
+	if !chinese {
 		return true
 	}
-	// Some IMEs only accept the API.
-	if himc, _, _ := immGetContext.Call(hwnd); himc != 0 {
-		defer immReleaseContext.Call(hwnd, himc)
-		var sentence uint32
-		if res, _, _ := immSetConvStatus.Call(himc, uintptr(conversion&^imeCmodeNative), uintptr(sentence)); res != 0 {
-			return true
+	return sendCtrlSpace()
+}
+
+// imeIsChinese reports whether the input method is in Chinese mode, and
+// whether that could be determined at all. The tray indicator near the clock
+// shows 中 or 英 and works for third-party IMEs and Text Services apps alike;
+// the IMM conversion status is the fallback for setups without the indicator.
+func imeIsChinese(ctx context.Context, hwnd uintptr) (bool, bool) {
+	if text, err := indicatorText(ctx); err == nil {
+		if chinese, known := imeModeFromIndicator(text); known {
+			return chinese, true
 		}
 	}
-	return false
+	if conversion, ok := imeConversion(hwnd); ok {
+		return conversion&imeCmodeNative != 0, true
+	}
+	return false, false
+}
+
+// imeModeFromIndicator reads the 中 / 英 marker out of the recognized text of
+// the tray area.
+func imeModeFromIndicator(text string) (bool, bool) {
+	if strings.Contains(text, "中") {
+		return true, true
+	}
+	if strings.Contains(text, "英") {
+		return false, true
+	}
+	return false, false
+}
+
+// indicatorText captures the bottom right corner of the primary screen, where
+// the input method draws its 中 / 英 indicator, and recognizes the text.
+func indicatorText(ctx context.Context) (string, error) {
+	cx, _, _ := getSystemMetrics.Call(smCxScreen)
+	cy, _, _ := getSystemMetrics.Call(smCyScreen)
+	const size = 320
+	rect := image.Rect(int(cx)-size, int(cy)-size, int(cx), int(cy))
+	shot, err := capture.Snapshot(rect)
+	if err != nil {
+		return "", err
+	}
+	return translation.RecognizeIndicator(ctx, shot)
 }
 
 // imeNeedsEnglish reports whether a known conversion mode is Chinese.
