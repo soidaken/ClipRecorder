@@ -44,6 +44,7 @@ var (
 	immGetConvStatus  = imm32.NewProc("ImmGetConversionStatus")
 	immSetConvStatus  = imm32.NewProc("ImmSetConversionStatus")
 	getSystemMetrics  = user32IME.NewProc("GetSystemMetrics")
+	monitorFromPoint  = user32IME.NewProc("MonitorFromPoint")
 )
 
 const (
@@ -179,18 +180,48 @@ func imeModeFromIndicator(text string) (bool, bool) {
 	return false, false
 }
 
-// indicatorText captures the bottom right corner of the primary screen, where
-// the input method draws its 中 / 英 indicator, and recognizes the text.
+// indicatorText captures the bottom right corner of the primary monitor, where
+// the input method draws its 中 / 英 indicator, and recognizes the text. Extra
+// monitors never matter: the taskbar indicator lives on the primary one.
 func indicatorText(ctx context.Context) (string, error) {
-	cx, _, _ := getSystemMetrics.Call(smCxScreen)
-	cy, _, _ := getSystemMetrics.Call(smCyScreen)
 	const size = 320
-	rect := image.Rect(int(cx)-size, int(cy)-size, int(cx), int(cy))
+	area, ok := primaryMonitorRect()
+	if !ok {
+		cx, _, _ := getSystemMetrics.Call(smCxScreen)
+		cy, _, _ := getSystemMetrics.Call(smCyScreen)
+		area = image.Rect(0, 0, int(cx), int(cy))
+	}
+	rect := rectWithin(area, size)
 	shot, err := capture.Snapshot(rect)
 	if err != nil {
 		return "", err
 	}
 	return translation.RecognizeIndicator(ctx, shot)
+}
+
+// rectWithin is the bottom right square of size inside area.
+func rectWithin(area image.Rectangle, size int) image.Rectangle {
+	return image.Rect(area.Max.X-size, area.Max.Y-size, area.Max.X, area.Max.Y)
+}
+
+// primaryMonitorRect is the full rectangle of the primary monitor in physical
+// pixels, including the taskbar.
+func primaryMonitorRect() (image.Rectangle, bool) {
+	origin := struct{ X, Y int32 }{}
+	monitor, _, _ := monitorFromPoint.Call(uintptr(unsafe.Pointer(&origin)), 1) // MONITOR_DEFAULTTOPRIMARY
+	if monitor == 0 {
+		return image.Rectangle{}, false
+	}
+	var info struct {
+		Size          uint32
+		Monitor, Work nativeRect
+		Flags         uint32
+	}
+	info.Size = uint32(unsafe.Sizeof(info))
+	if ok, _, _ := getMonitorInfo.Call(monitor, uintptr(unsafe.Pointer(&info))); ok == 0 {
+		return image.Rectangle{}, false
+	}
+	return image.Rect(int(info.Monitor.Left), int(info.Monitor.Top), int(info.Monitor.Right), int(info.Monitor.Bottom)), true
 }
 
 // imeNeedsEnglish reports whether a known conversion mode is Chinese.
