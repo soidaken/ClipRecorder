@@ -123,28 +123,35 @@ func switchIMEToEnglish() bool {
 	if hwnd == 0 || hwnd == ^uintptr(0) {
 		return false
 	}
-	// With an IMM context the current mode can be read: an IME that is already
-	// in English would be toggled back to Chinese by Ctrl+Space, so leave it.
-	conversion, convOK := imeConversion(hwnd)
-	if convOK && conversion&imeCmodeNative == 0 {
-		return true
-	}
-	sent := sendCtrlSpace()
-	if !sent {
-		// Some IMEs only accept the API. Fall back to it when they report a
-		// context of their own.
-		if himc, _, _ := immGetContext.Call(hwnd); himc != 0 {
-			defer immReleaseContext.Call(hwnd, himc)
-			var conversion, sentence uint32
-			if ok, _, _ := immGetConvStatus.Call(himc, uintptr(unsafe.Pointer(&conversion)), uintptr(unsafe.Pointer(&sentence))); ok != 0 {
-				if res, _, _ := immSetConvStatus.Call(himc, uintptr(conversion&^imeCmodeNative), uintptr(sentence)); res != 0 {
-					return true
-				}
-			}
-		}
+	// Only switch when the IME itself reports Chinese mode. Ctrl+Space toggles,
+	// so sending it blind would turn English into Chinese for half of the
+	// applications, and Text Services apps (Chrome, VS Code, Windows 11
+	// Notepad) expose no mode we can read.
+	conversion, known := imeConversion(hwnd)
+	if !known {
+		log.Print("输入法状态不可读，跳过切换")
 		return false
 	}
-	return true
+	if !imeNeedsEnglish(conversion, known) {
+		return true // already alphanumeric
+	}
+	if sendCtrlSpace() {
+		return true
+	}
+	// Some IMEs only accept the API.
+	if himc, _, _ := immGetContext.Call(hwnd); himc != 0 {
+		defer immReleaseContext.Call(hwnd, himc)
+		var sentence uint32
+		if res, _, _ := immSetConvStatus.Call(himc, uintptr(conversion&^imeCmodeNative), uintptr(sentence)); res != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// imeNeedsEnglish reports whether a known conversion mode is Chinese.
+func imeNeedsEnglish(conversion uint32, known bool) bool {
+	return known && conversion&imeCmodeNative != 0
 }
 
 // imeConversion reads the conversion mode of the window's input method.

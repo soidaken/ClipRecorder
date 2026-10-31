@@ -72,3 +72,21 @@ func TestIMEIdleDoesNotSwitchWhenDisabled(t *testing.T) {
 		t.Fatalf("disabled watcher switched: %d", got)
 	}
 }
+
+func TestIMENeedsEnglishOnlyWhenKnownAndChinese(t *testing.T) {
+	cases := []struct {
+		conversion uint32
+		known      bool
+		want       bool
+	}{
+		{1, true, true},   // native (Chinese) reported
+		{0, true, false},  // alphanumeric
+		{1, false, false}, // unknown state: never guess
+		{0, false, false},
+	}
+	for _, c := range cases {
+		if got := imeNeedsEnglish(c.conversion, c.known); got != c.want {
+			t.Fatalf("imeNeedsEnglish(%#x, %v) = %v, want %v", c.conversion, c.known, got, c.want)
+		}
+	}
+}
