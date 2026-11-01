@@ -529,7 +529,7 @@ func (s *selection) recordControls(c *ui.Context, x, y, width float32) {
 				choiceControlEnabled(c, &index, 64, []bool{true, s.hardwareChecked && s.hardwareError == nil && len(s.hardwareNames) > 0, true}, i18n.T("自动"), i18n.T("硬件"), i18n.T("软件"))
 				s.options.Encoding = recording.EncodingMode(index)
 			})
-			detail := strings.Join(s.hardwareNames, "、")
+			detail := strings.Join(s.hardwareNames, i18n.ListSeparator())
 			if s.hardwareError != nil {
 				detail = s.hardwareError.Error()
 			}
@@ -544,7 +544,7 @@ func (s *selection) recordControls(c *ui.Context, x, y, width float32) {
 		ui.Row(c).Gap(8).Children(func() {
 			ui.Text(c, i18n.T(text)).FontSize(11).TextColor(muted).Grow(1)
 			if s.selected && s.hardwareChecked && s.hardwareError == nil {
-				encoderBadge(c, s.encoderUsesHardware(), strings.Join(s.hardwareNames, "、"))
+				encoderBadge(c, s.encoderUsesHardware(), strings.Join(s.hardwareNames, i18n.ListSeparator()))
 			}
 		})
 		ui.Box(c).Height(1).Background(ui.RGBA(255, 255, 255, 0.08)).PassThrough()

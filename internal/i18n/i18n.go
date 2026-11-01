@@ -148,3 +148,11 @@ func save(l Lang) error {
 	defer key.Close()
 	return key.SetStringValue(languageValue, string(l))
 }
+
+// ListSeparator joins names in a list the way the language does.
+func ListSeparator() string {
+	if Current() == EN {
+		return ", "
+	}
+	return "、"
+}

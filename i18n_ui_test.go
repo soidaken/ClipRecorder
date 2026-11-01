@@ -2,6 +2,10 @@ package main
 
 import (
 	"image"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -120,5 +124,42 @@ func TestRecordingBarFollowsLanguage(t *testing.T) {
 	}
 	if tt.HasText("录制中") || tt.HasText("高清") {
 		t.Fatal("Chinese labels survived the Japanese switch")
+	}
+}
+
+// TestNoHardcodedChineseLabels keeps accessible labels and tooltips in the
+// translation catalog: a literal here would stay Chinese in every language.
+func TestNoHardcodedChineseLabels(t *testing.T) {
+	hasCJK := func(s string) bool {
+		for _, r := range s {
+			if r >= 0x4e00 && r <= 0x9fff {
+				return true
+			}
+		}
+		return false
+	}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`\.Label\("([^"]*)"\)`),
+		regexp.MustCompile(`\.Tooltip\("([^"]*)"\)`),
+	}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		source, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, pattern := range patterns {
+			for _, match := range pattern.FindAllStringSubmatch(string(source), -1) {
+				if hasCJK(match[1]) {
+					t.Fatalf("%s hardcodes a Chinese label: %s", name, match[0])
+				}
+			}
+		}
 	}
 }
