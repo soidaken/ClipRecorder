@@ -3,6 +3,9 @@ package main
 import (
 	"image"
 	"testing"
+	"time"
+
+	"cliprecorder/internal/recording"
 
 	"cliprecorder/internal/i18n"
 	"github.com/egoist/mygo"
@@ -94,6 +97,28 @@ func TestRecordingPanelTranslatesRatioAndStatus(t *testing.T) {
 		}
 	}
 	if tt.HasText("比例") || tt.HasText("开始录制") {
+		t.Fatal("Chinese labels survived the Japanese switch")
+	}
+}
+
+func TestRecordingBarFollowsLanguage(t *testing.T) {
+	previous := i18n.Current()
+	t.Cleanup(func() { i18n.Use(previous) })
+	i18n.Use(i18n.JA)
+
+	a := &app{}
+	job := &recordJob{start: time.Now().Add(-65 * time.Second), options: recording.DefaultOptions()}
+	tt := ui.NewTester(func(c *ui.Context) { a.recordView(c, job) }, 420, 120)
+	if !tt.HasText("ソフトウェアエンコード") {
+		t.Fatalf("encoder label not translated: %q", tt.Texts())
+	}
+	if !tt.HasText("高画質") || !tt.HasText("システム音声") {
+		t.Fatalf("quality/audio labels not translated: %q", tt.Texts())
+	}
+	if !tt.HasText("停止") {
+		t.Fatalf("stop button not translated: %q", tt.Texts())
+	}
+	if tt.HasText("录制中") || tt.HasText("高清") {
 		t.Fatal("Chinese labels survived the Japanese switch")
 	}
 }
