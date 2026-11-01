@@ -67,7 +67,7 @@ func main() {
 	})
 	mygo.App.WhenReady(func() {
 		a.shotSaveFile = true
-		imeWatch.enabled.Store(true)
+		imeWatch.enabled.Store(loadIMEIdlePref())
 		imeWatch.install()
 		startupItem := a.autostartMenuItem()
 		menu := mygo.NewMenu([]*mygo.MenuItem{
@@ -310,9 +310,13 @@ func saveShotItem(a *app) *mygo.MenuItem {
 func imeIdleItem() *mygo.MenuItem {
 	item := &mygo.MenuItem{ID: "ime-idle", Label: "6 秒无键盘输入后切换英文输入法", Type: mygo.MenuItemCheckbox, Checked: imeWatch.enabled.Load()}
 	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
-		imeWatch.enabled.Store(item.IsChecked())
+		enabled := item.IsChecked()
+		imeWatch.enabled.Store(enabled)
 		imeWatch.lastKey.Store(time.Now().UnixNano())
 		imeWatch.done.Store(false)
+		if err := saveIMEIdlePrefFunc(enabled); err != nil {
+			log.Print("保存输入法切换设置失败: ", err)
+		}
 	}
 	return item
 }

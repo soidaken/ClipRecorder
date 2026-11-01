@@ -13,6 +13,7 @@ import (
 
 	"cliprecorder/internal/capture"
 	"cliprecorder/internal/translation"
+	"golang.org/x/sys/windows/registry"
 )
 
 // After a few seconds without keyboard input the input method is switched to
@@ -263,4 +264,35 @@ func sendCtrlSpace() bool {
 	}
 	sent, _, _ := sendInput.Call(uintptr(len(inputs)), uintptr(unsafe.Pointer(&inputs[0])), unsafe.Sizeof(inputs[0]))
 	return sent == uintptr(len(inputs))
+}
+
+// The idle switch is off until the user turns it on in the tray menu; the
+// choice survives restarts.
+const imePrefValue = "ImeIdleSwitch"
+
+func loadIMEIdlePref() bool {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\ClipRecorder`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer key.Close()
+	value, _, err := key.GetIntegerValue(imePrefValue)
+	return err == nil && value != 0
+}
+
+// saveIMEIdlePrefFunc is swapped in tests so they never touch the real
+// setting.
+var saveIMEIdlePrefFunc = saveIMEIdlePref
+
+func saveIMEIdlePref(enabled bool) error {
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\ClipRecorder`, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	value := uint32(0)
+	if enabled {
+		value = 1
+	}
+	return key.SetDWordValue(imePrefValue, value)
 }
