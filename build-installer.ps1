@@ -1,4 +1,4 @@
-param([string]$Version = '1.4.2')
+param([string]$Version = '1.4.3')
 $ErrorActionPreference = 'Stop'
 
 & (Join-Path $PSScriptRoot 'build.ps1')
