@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -107,6 +108,30 @@ func TestIMENeedsEnglishOnlyWhenKnownAndChinese(t *testing.T) {
 	for _, c := range cases {
 		if got := imeNeedsEnglish(c.conversion, c.known); got != c.want {
 			t.Fatalf("imeNeedsEnglish(%#x, %v) = %v, want %v", c.conversion, c.known, got, c.want)
+		}
+	}
+}
+
+func TestInjectedKeysUseRealScanCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		vk     uint16
+		expect uint16
+	}{
+		{"control", vkControl, 0x1d},
+		{"space", vkSpace, 0x39},
+	} {
+		raw := keyboardInputBytes(tc.vk, 0)
+		vk := binary.LittleEndian.Uint16(raw[8:])
+		scan := binary.LittleEndian.Uint16(raw[10:])
+		if vk != tc.vk {
+			t.Fatalf("%s: virtual key %#x", tc.name, vk)
+		}
+		if scan == tc.vk {
+			t.Fatalf("%s: scan code repeats the virtual key (%#x), which types letters", tc.name, scan)
+		}
+		if scan != tc.expect {
+			t.Fatalf("%s: scan code %#x, want %#x", tc.name, scan, tc.expect)
 		}
 	}
 }

@@ -45,6 +45,7 @@ var (
 	immGetConvStatus  = imm32.NewProc("ImmGetConversionStatus")
 	immSetConvStatus  = imm32.NewProc("ImmSetConversionStatus")
 	getSystemMetrics  = user32IME.NewProc("GetSystemMetrics")
+	mapVirtualKey     = user32IME.NewProc("MapVirtualKeyW")
 	monitorFromPoint  = user32IME.NewProc("MonitorFromPoint")
 )
 
@@ -244,11 +245,16 @@ func imeConversion(hwnd uintptr) (uint32, bool) {
 
 // keyboardInputBytes builds a 40 byte INPUT for one keyboard event, the size
 // Windows expects on amd64 (type, padding, then the 32 byte union).
+//
+// The scan code must be the real one: writing the virtual key there made
+// receivers translate it again, so Ctrl+Space arrived as the letters "wd"
+// (scan codes 0x11 and 0x20) in some input fields.
 func keyboardInputBytes(vk uint16, flags uint32) [40]byte {
 	var b [40]byte
 	binary.LittleEndian.PutUint32(b[0:], inputKeyboard)
 	binary.LittleEndian.PutUint16(b[8:], vk)
-	binary.LittleEndian.PutUint16(b[10:], vk)
+	scan, _, _ := mapVirtualKey.Call(uintptr(vk), 0) // MAPVK_VK_TO_VSC
+	binary.LittleEndian.PutUint16(b[10:], uint16(scan))
 	binary.LittleEndian.PutUint32(b[12:], flags)
 	return b
 }
