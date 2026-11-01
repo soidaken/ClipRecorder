@@ -133,7 +133,7 @@ func recordingStopButton(c *ui.Context, enabled bool) ui.Element {
 					color = muted
 				}
 				ui.Box(c).Size(8, 8).Radius(2).Background(color)
-				ui.Text(c, "停止").TextColor(ink).FontWeight(500)
+				ui.Text(c, i18n.T("停止")).TextColor(ink).FontWeight(500)
 			})
 			ui.Text(c, "Ctrl+Shift+T").Font("Segoe UI").FontSize(9).TextColor(muted).TextAlign(ui.Center)
 		})

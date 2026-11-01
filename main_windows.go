@@ -95,7 +95,7 @@ func main() {
 			{"Ctrl+Shift+T", a.stop},
 		} {
 			if err = mygo.GlobalShortcut.Register(shortcut.key, shortcut.action); err != nil {
-				a.notify("快捷键注册失败", fmt.Sprintf("%s: %v，可从托盘菜单操作", shortcut.key, err))
+				a.notify(i18n.T("快捷键注册失败"), i18n.Tf("%s: %v，可从托盘菜单操作", shortcut.key, err))
 			}
 		}
 		// A bounded real-window smoke check for local development.
@@ -289,7 +289,7 @@ func hasArg(args []string, want string) bool {
 func saveShotItem(a *app) *mygo.MenuItem {
 	// A real checkbox item: MyGo flips Checked before calling Click, and the
 	// menu shows the new state when it opens again.
-	item := &mygo.MenuItem{ID: "save-shot", Label: "截图保存文件", Type: mygo.MenuItemCheckbox, Checked: a.shotSaveFile}
+	item := &mygo.MenuItem{ID: "save-shot", Label: i18n.T("截图保存文件"), Type: mygo.MenuItemCheckbox, Checked: a.shotSaveFile}
 	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
 		a.shotSaveFile = item.IsChecked()
 	}
@@ -298,7 +298,7 @@ func saveShotItem(a *app) *mygo.MenuItem {
 
 // imeIdleItem toggles switching to English after a pause in typing.
 func imeIdleItem() *mygo.MenuItem {
-	item := &mygo.MenuItem{ID: "ime-idle", Label: "6 秒无键盘输入后切换英文输入法", Type: mygo.MenuItemCheckbox, Checked: imeWatch.enabled.Load()}
+	item := &mygo.MenuItem{ID: "ime-idle", Label: i18n.T("6 秒无键盘输入后切换英文输入法"), Type: mygo.MenuItemCheckbox, Checked: imeWatch.enabled.Load()}
 	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
 		enabled := item.IsChecked()
 		imeWatch.enabled.Store(enabled)
@@ -314,9 +314,8 @@ func imeIdleItem() *mygo.MenuItem {
 // trayMenu builds the tray menu in the current language. It is rebuilt when the
 // language changes.
 func (a *app) trayMenu() *mygo.Menu {
-	if a.startupItem == nil {
-		a.startupItem = a.autostartMenuItem()
-	}
+	// Rebuilt with the menu, so its label follows the language too.
+	a.startupItem = a.autostartMenuItem()
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: i18n.T("截图  ·  Ctrl+I"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
 		{Label: i18n.T("开始录制  ·  Ctrl+R"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(true) }},

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
 	"log"
 	"os"
 
@@ -14,7 +15,7 @@ func (a *app) autostartMenuItem() *mygo.MenuItem {
 	if err != nil {
 		log.Printf("读取开机启动设置失败：%v", err)
 	}
-	return &mygo.MenuItem{ID: "autostart", Label: "开机启动", Type: mygo.MenuItemCheckbox, Checked: enabled,
+	return &mygo.MenuItem{ID: "autostart", Label: i18n.T("开机启动"), Type: mygo.MenuItemCheckbox, Checked: enabled,
 		Click: func(item *mygo.MenuItem, _ *mygo.Window) {
 			// MyGo toggles checkbox items before invoking Click.
 			path, err := os.Executable()
@@ -28,7 +29,7 @@ func (a *app) autostartMenuItem() *mygo.MenuItem {
 				} else {
 					item.SetChecked(!item.IsChecked())
 				}
-				a.notify("开机启动设置失败", err.Error())
+				a.notify(i18n.T("开机启动设置失败"), err.Error())
 			}
 		},
 	}

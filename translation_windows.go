@@ -302,7 +302,7 @@ func (o *translationOverlay) view(c *ui.Context) {
 			translationPill(c, o.status, false, ui.Center)
 			c.After(16 * time.Millisecond) // the scan band moves
 		case o.failed:
-			translationPill(c, o.status+" · Esc 关闭", true, ui.Center)
+			translationPill(c, o.status+i18n.T(" · Esc 关闭"), true, ui.Center)
 		case !peek && !o.shown.IsZero() && time.Since(o.shown) < translationHint:
 			// Held back until the result is stored, so the saved copy is clean.
 			if time.Since(o.shown) > 600*time.Millisecond {
@@ -394,7 +394,7 @@ func modelImage(img *image.RGBA) *image.RGBA {
 func encodeJPEG(img image.Image) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 82}); err != nil {
-		return nil, fmt.Errorf("无法生成截图副本：%w", err)
+		return nil, fmt.Errorf(i18n.T("无法生成截图副本：%w"), err)
 	}
 	return buf.Bytes(), nil
 }
@@ -402,7 +402,7 @@ func encodeJPEG(img image.Image) ([]byte, error) {
 func writePNG(path string, img image.Image) error {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		return fmt.Errorf("无法生成翻译图片：%w", err)
+		return fmt.Errorf(i18n.T("无法生成翻译图片：%w"), err)
 	}
 	return os.WriteFile(path, buf.Bytes(), 0o644)
 }

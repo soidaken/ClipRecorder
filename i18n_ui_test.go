@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cliprecorder/internal/i18n"
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -52,5 +53,29 @@ func TestRecordingPanelFollowsLanguage(t *testing.T) {
 		if !tt.HasText(text) {
 			t.Fatalf("English recording panel is missing %q", text)
 		}
+	}
+}
+
+func TestTrayItemLabelsFollowLanguage(t *testing.T) {
+	previous := i18n.Current()
+	t.Cleanup(func() { i18n.Use(previous) })
+
+	a := &app{shotSaveFile: true}
+	i18n.Use(i18n.JA)
+	items := []*mygo.MenuItem{a.autostartMenuItem(), saveShotItem(a), imeIdleItem()}
+	want := []string{"スタートアップ", "撮影画像を保存", "6 秒入力が無ければ英語入力"}
+	for i, item := range items {
+		if item.Label != want[i] {
+			t.Fatalf("item %d label = %q, want %q", i, item.Label, want[i])
+		}
+	}
+
+	i18n.Use(i18n.EN)
+	a2 := &app{shotSaveFile: true}
+	if got := saveShotItem(a2).Label; got != "Save shots to disk" {
+		t.Fatalf("english label: %q", got)
+	}
+	if got := imeIdleItem().Label; got != "English after 6 s without typing" {
+		t.Fatalf("english ime label: %q", got)
 	}
 }

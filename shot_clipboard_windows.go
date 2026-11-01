@@ -1,6 +1,8 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -101,7 +103,7 @@ func withClipboard(fill func() error) (err error) {
 		}
 	}()
 	if ok, _, _ := emptyClipboard.Call(); ok == 0 {
-		return fmt.Errorf("无法清空剪贴板")
+		return errors.New(i18n.T("无法清空剪贴板"))
 	}
 	return fill()
 }
@@ -115,7 +117,7 @@ func openClipboardRetry() error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	return fmt.Errorf("剪贴板正被其它程序占用")
+	return errors.New(i18n.T("剪贴板正被其它程序占用"))
 }
 
 func setClipboardBytes(format uintptr, data []byte) error {
