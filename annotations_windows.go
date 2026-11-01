@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
 	"image"
 	"math"
 	"strconv"
@@ -385,13 +386,13 @@ func drawToolIcon(p *ui.Painter, r ui.Rect, tool annotationTool, color ui.Color)
 func toolLabel(tool annotationTool) string {
 	switch tool {
 	case toolPen:
-		return "画笔"
+		return i18n.T("画笔")
 	case toolBlur:
-		return "模糊"
+		return i18n.T("模糊")
 	case toolNumber:
-		return "序号标记"
+		return i18n.T("序号标记")
 	case toolMark:
-		return "标记区域"
+		return i18n.T("标记区域")
 	}
 	return ""
 }

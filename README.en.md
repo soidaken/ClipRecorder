@@ -22,7 +22,7 @@ A native Windows screenshot, screen recorder and region translator that lives in
 | `Ctrl+Shift+T` / "Stop" on the floating bar | Stop and save the recording |
 | `Esc` / right click | Cancel the selection |
 
-The tray menu offers the same actions, toggles start-at-login, and can switch to English input after 6 seconds without typing (off by default, tick it to enable and the choice is remembered; it sends Ctrl+Space, so the installed IME switches to English instead of the system ENG layout). It decides by OCR-ing the bottom right 320×320 pixels of the primary screen (extra monitors are ignored) for the 中 / 英 indicator (third-party IMEs included) and only fires when Chinese is confirmed; without a readable indicator it falls back to the IMM status, and skips when neither is available, so Ctrl+Space never turns English back into Chinese.
+The tray menu offers the same actions, toggles start-at-login, and can switch to English input after 6 seconds without typing. The "Language" entry at the bottom switches the interface between 中文（简体）, 中文（繁體）, English and 日本語; a first start follows the Windows display language and the choice is remembered (off by default, tick it to enable and the choice is remembered; it sends Ctrl+Space, so the installed IME switches to English instead of the system ENG layout). It decides by OCR-ing the bottom right 320×320 pixels of the primary screen (extra monitors are ignored) for the 中 / 英 indicator (third-party IMEs included) and only fires when Chinese is confirmed; without a readable indicator it falls back to the IMM status, and skips when neither is available, so Ctrl+Space never turns English back into Chinese.
 
 ## Annotating a shot
 

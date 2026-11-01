@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"cliprecorder/internal/capture"
+	"cliprecorder/internal/i18n"
 	"cliprecorder/internal/recording"
 	"fmt"
 	"image"
@@ -276,9 +277,9 @@ func (s *selection) view(c *ui.Context) {
 		width, height := float32(s.desktop.Dx())/scale, float32(s.desktop.Dy())/scale
 		if !s.selected {
 			if !s.dragging && !s.record {
-				text := "拖动框选截图区域，松开后确认复制 · Esc / 右键取消"
+				text := i18n.T("拖动框选截图区域，松开后确认复制 · Esc / 右键取消")
 				if s.translate {
-					text = "拖动框选英文区域，松开后自动翻译 · Esc / 右键取消"
+					text = i18n.T("拖动框选英文区域，松开后自动翻译 · Esc / 右键取消")
 				}
 				bottom := float32(24)
 				ui.Row(c).Absolute().Bottom(bottom).Left(0).Right(0).Center().PassThrough().Children(func() {
@@ -328,11 +329,11 @@ func (s *selection) view(c *ui.Context) {
 			}
 			ui.Box(c).Size(1, 20).Shrink(0).Background(ui.RGBA(255, 255, 255, 0.14))
 			qualityControl(c, &s.quality)
-			if cardButton(c, s.card).Label("截图圆角阴影").Clicked() {
+			if cardButton(c, s.card).Label(i18n.T("截图圆角阴影")).Clicked() {
 				s.card = !s.card
 			}
 			pathCheckbox(c, &s.copyPath)
-			if confirmButton(c, "确认", true).Grow(1).Clicked() {
+			if confirmButton(c, i18n.T("确认"), true).Grow(1).Clicked() {
 				s.confirm()
 			}
 		})
@@ -405,7 +406,7 @@ func (s *selection) copyAnnotated(rect image.Rectangle) {
 			s.window.Close()
 			if err != nil {
 				s.copyImage(s.snapshot.SubImage(rect))
-				s.app.notify("标注未能随截图复制", err.Error())
+				s.app.notify(i18n.T("标注未能随截图复制"), err.Error())
 				return
 			}
 			s.copyImage(shot)
@@ -421,14 +422,14 @@ func (s *selection) copyImage(img image.Image) {
 		copied := prepareCopy(img, quality, card)
 		var out bytes.Buffer
 		if err := png.Encode(&out, copied); err != nil {
-			s.app.notify("截图复制失败", err.Error())
+			s.app.notify(i18n.T("截图复制失败"), err.Error())
 			return
 		}
 		pngBytes := out.Bytes()
 		path := ""
 		if s.app != nil && s.app.shotSaveFile {
 			if saved, err := saveShot(pngBytes); err != nil {
-				s.app.notify("截图保存失败", err.Error())
+				s.app.notify(i18n.T("截图保存失败"), err.Error())
 			} else {
 				path = saved
 			}
@@ -437,7 +438,7 @@ func (s *selection) copyImage(img image.Image) {
 			path = ""
 		}
 		if err := copyShotToClipboard(copied, pngBytes, path); err != nil {
-			s.app.notify("截图复制失败", err.Error())
+			s.app.notify(i18n.T("截图复制失败"), err.Error())
 		}
 	}()
 }
@@ -494,70 +495,70 @@ func (s *selection) recordControls(c *ui.Context, x, y, width float32) {
 		Padding(16).Gap(12)).Children(func() {
 		ui.Row(c).Gap(8).Children(func() {
 			ui.Column(c).Grow(1).Gap(3).Children(func() {
-				ui.Text(c, "屏幕录制").FontSize(15).FontWeight(600)
-				text := "拖动框选区域，再开始录制"
+				ui.Text(c, i18n.T("屏幕录制")).FontSize(15).FontWeight(600)
+				text := i18n.T("拖动框选区域，再开始录制")
 				if s.selected {
-					text = "区域已选定，准备就绪"
+					text = i18n.T("区域已选定，准备就绪")
 				}
 				ui.Text(c, text).FontSize(12).TextColor(muted)
 			})
-			ui.Text(c, "Esc 取消").FontSize(11).TextColor(muted)
+			ui.Text(c, i18n.T("Esc 取消")).FontSize(11).TextColor(muted)
 		})
 		ui.Row(c).Gap(10).Children(func() {
-			audioCheckbox(c.Key("system-audio"), &s.options.SystemAudio, "系统声音")
-			audioCheckbox(c.Key("microphone"), &s.options.Microphone, "麦克风")
+			audioCheckbox(c.Key("system-audio"), &s.options.SystemAudio, i18n.T("系统声音"))
+			audioCheckbox(c.Key("microphone"), &s.options.Microphone, i18n.T("麦克风"))
 		})
 		ui.Row(c).Gap(12).Children(func() {
-			ui.Text(c, "帧率").TextColor(muted).Grow(1)
+			ui.Text(c, i18n.T("帧率")).TextColor(muted).Grow(1)
 			frameRateControl(c, &s.fpsIndex)
 			s.options.FPS = []int{30, 60}[s.fpsIndex]
 		})
 		ui.Row(c).Gap(12).Children(func() {
-			ui.Text(c, "画质").TextColor(muted).Grow(1)
+			ui.Text(c, i18n.T("画质")).TextColor(muted).Grow(1)
 			index := int(s.options.Quality)
-			choiceControl(c, &index, 64, "标准", "高清", "极清")
+			choiceControl(c, &index, 64, i18n.T("标准"), i18n.T("高清"), i18n.T("极清"))
 			s.options.Quality = recording.Quality(index)
 		})
 		s.aspectControl(c)
 		ui.Column(c.Key("encoding-settings")).Gap(6).Children(func() {
 			ui.Row(c).Gap(12).Children(func() {
-				ui.Text(c, "编码方式").TextColor(muted).Grow(1).
-					Tooltip("自动：按当前参数优先使用硬件；软件：始终使用软件；硬件：仅在检测通过后可选，参数不再支持时切到软件")
+				ui.Text(c, i18n.T("编码方式")).TextColor(muted).Grow(1).
+					Tooltip(i18n.T("自动：按当前参数优先使用硬件；软件：始终使用软件；硬件：仅在检测通过后可选，参数不再支持时切到软件"))
 				s.updateEncoderCheck()
 				index := int(s.options.Encoding)
-				choiceControlEnabled(c, &index, 64, []bool{true, s.hardwareChecked && s.hardwareError == nil && len(s.hardwareNames) > 0, true}, "自动", "硬件", "软件")
+				choiceControlEnabled(c, &index, 64, []bool{true, s.hardwareChecked && s.hardwareError == nil && len(s.hardwareNames) > 0, true}, i18n.T("自动"), i18n.T("硬件"), i18n.T("软件"))
 				s.options.Encoding = recording.EncodingMode(index)
 			})
 			detail := strings.Join(s.hardwareNames, "、")
 			if s.hardwareError != nil {
 				detail = s.hardwareError.Error()
 			}
-			ui.Text(c, s.encodingStatus()).FontSize(11).TextColor(muted).Tooltip(detail)
+			ui.Text(c, i18n.T(s.encodingStatus())).FontSize(11).TextColor(muted).Tooltip(detail)
 		})
 		text := "按原始像素录制，画质越高文件越大"
 		if s.selected {
 			r := s.physicalRect()
 			w, h := r.Dx()/2*2, r.Dy()/2*2
-			text = fmt.Sprintf("%d × %d · 目标 %.1f Mbps · H.264 High", w, h, float64(s.options.VideoBitrate(w, h))/1000000)
+			text = i18n.Tf("%d × %d · 目标 %.1f Mbps · H.264 High", w, h, float64(s.options.VideoBitrate(w, h))/1000000)
 		}
 		ui.Row(c).Gap(8).Children(func() {
-			ui.Text(c, text).FontSize(11).TextColor(muted).Grow(1)
+			ui.Text(c, i18n.T(text)).FontSize(11).TextColor(muted).Grow(1)
 			if s.selected && s.hardwareChecked && s.hardwareError == nil {
 				encoderBadge(c, s.encoderUsesHardware(), strings.Join(s.hardwareNames, "、"))
 			}
 		})
 		ui.Box(c).Height(1).Background(ui.RGBA(255, 255, 255, 0.08)).PassThrough()
 		ui.Row(c).Gap(8).Children(func() {
-			label := "开始录制"
+			label := i18n.T("开始录制")
 			if !s.selected {
-				label = "请先框选区域"
+				label = i18n.T("请先框选区域")
 			} else if !s.hardwareChecked {
-				label = "正在检测编码…"
+				label = i18n.T("正在检测编码…")
 			}
 			if toolButton(c, label, true, s.selected && s.hardwareChecked && s.hardwareError == nil).Grow(1).Clicked() {
 				s.confirm()
 			}
-			if toolButton(c, "取消", false, true).Clicked() {
+			if toolButton(c, i18n.T("取消"), false, true).Clicked() {
 				s.window.Close()
 			}
 		})
@@ -570,17 +571,18 @@ const hintBlurSigma = 3.5
 
 const hintChipHeight = float32(28)
 
-// hintChipWidth fits "Esc 取消" at 12px with 10px padding on each side.
-var hintChipWidth = func() float32 {
-	w, _ := ui.ShapeText("Esc 取消", ui.Font{Family: uiFont, Size: 12}, 0).Size()
+// hintChipWidth fits the hint text at 12px with 10px padding on each side; it
+// depends on the language, so it is measured when it is needed.
+func hintChipWidth() float32 {
+	w, _ := ui.ShapeText(i18n.T("Esc 取消"), ui.Font{Family: uiFont, Size: 12}, 0).Size()
 	return w + 20
-}()
+}
 
 // hintChip shows "Esc 取消" on one fixed dark chip. Blending the frozen page
 // into it made it look like a light plate on white pages and like glass on
 // dark ones; a constant colour reads the same everywhere.
 func (s *selection) hintChip(c *ui.Context, r ui.Rect) {
-	text := "Esc 取消"
+	text := i18n.T("Esc 取消")
 	font := ui.Font{Family: uiFont, Size: 12}
 	layout := ui.ShapeText(text, font, 0)
 	_, textH := layout.Size()
@@ -597,8 +599,8 @@ func (s *selection) hintChip(c *ui.Context, r ui.Rect) {
 // left edge and moved aside when the toolbar would overlap it.
 func (s *selection) hintChipAt(toolbarX, toolbarY float32) ui.Rect {
 	x := max(float32(8), s.rect.X)
-	if limit := toolbarX - 8 - hintChipWidth; x > limit {
+	if limit := toolbarX - 8 - hintChipWidth(); x > limit {
 		x = max(float32(8), limit)
 	}
-	return ui.Rect{X: x, Y: toolbarY + (54-hintChipHeight)/2, W: hintChipWidth, H: hintChipHeight}
+	return ui.Rect{X: x, Y: toolbarY + (54-hintChipHeight)/2, W: hintChipWidth(), H: hintChipHeight}
 }

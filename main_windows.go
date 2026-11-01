@@ -14,6 +14,7 @@ import (
 
 	"cliprecorder/internal/autostart"
 	"cliprecorder/internal/capture"
+	"cliprecorder/internal/i18n"
 	"cliprecorder/internal/recording"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -21,6 +22,7 @@ import (
 
 type app struct {
 	tray        *mygo.Tray
+	startupItem *mygo.MenuItem
 	selection   *selection
 	job         *recordJob
 	quitting    bool
@@ -69,30 +71,18 @@ func main() {
 		a.shotSaveFile = true
 		imeWatch.enabled.Store(loadIMEIdlePref())
 		imeWatch.install()
-		startupItem := a.autostartMenuItem()
-		menu := mygo.NewMenu([]*mygo.MenuItem{
-			{Label: "截图  ·  Ctrl+I", Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
-			{Label: "开始录制  ·  Ctrl+R", Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(true) }},
-			{Label: "框选翻译  ·  Ctrl+T", Click: func(*mygo.MenuItem, *mygo.Window) { a.beginTranslate() }},
-			{Label: "停止录制  ·  Ctrl+Shift+T", Click: func(*mygo.MenuItem, *mygo.Window) { a.stop() }},
-			mygo.Separator(),
-			startupItem,
-			saveShotItem(a),
-			imeIdleItem(),
-			{Label: "设置 DeepSeek Key…", Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
-			mygo.Separator(),
-			{Label: "退出", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
-		})
+		i18n.Load()
+		a.startupItem = a.autostartMenuItem()
 		var err error
-		a.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayPNG(), ToolTip: "ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译", Menu: menu})
+		a.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayPNG(), ToolTip: i18n.T("ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译"), Menu: a.trayMenu()})
 		if err != nil {
 			log.Print(err)
 			mygo.App.Quit()
 			return
 		}
 		a.tray.OnRightClick(func() {
-			if enabled, err := autostart.New().Enabled(); err == nil {
-				startupItem.SetChecked(enabled)
+			if enabled, autostartErr := autostart.New().Enabled(); autostartErr == nil {
+				a.startupItem.SetChecked(enabled)
 			}
 		})
 		for _, shortcut := range []struct {
@@ -138,20 +128,20 @@ func (a *app) beginSelection(record, translate bool) {
 	// Screenshots and translation work during a recording; only a second
 	// recording has to wait.
 	if record && a.job != nil {
-		a.notify("正在录制", "请先停止当前录制（Ctrl+Shift+T）再开始新的录制")
+		a.notify("正在录制", i18n.T("请先停止当前录制（Ctrl+Shift+T）再开始新的录制"))
 		return
 	}
 	a.closeTranslation()
 	bounds := capture.Desktop()
 	snapshot, err := capture.Snapshot(bounds)
 	if err != nil {
-		a.notify("截图失败", err.Error())
+		a.notify(i18n.T("截图失败"), err.Error())
 		return
 	}
 	s := &selection{app: a, record: record, translate: translate, desktop: bounds, snapshot: snapshot, bitmap: ui.NewBitmap(snapshot), options: recording.DefaultOptions(), fpsIndex: 1, quality: qualityMedium, card: true}
 	a.selection = s
 	s.window = mygo.NewWindow(mygo.WindowOptions{
-		Title: "ClipRecorder · 选择区域", Content: ui.View(s.view), Hidden: true,
+		Title: i18n.T("ClipRecorder · 选择区域"), Content: ui.View(s.view), Hidden: true,
 		Frameless: true, AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableShadow: true,
 		Width: 800, Height: 600, BackgroundColor: "#101419",
 	})
@@ -172,14 +162,14 @@ func (a *app) beginSelection(record, translate bool) {
 func (a *app) record(rect image.Rectangle, options recording.Options) {
 	path, err := recording.OutputPath()
 	if err != nil {
-		a.notify("录屏失败", err.Error())
+		a.notify(i18n.T("录屏失败"), err.Error())
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	j := &recordJob{cancel: cancel, options: options}
 	a.job = j
 	j.window = mygo.NewWindow(mygo.WindowOptions{
-		Title: "ClipRecorder · 正在录制", Content: ui.View(func(c *ui.Context) { a.recordView(c, j) }),
+		Title: i18n.T("ClipRecorder · 正在录制"), Content: ui.View(func(c *ui.Context) { a.recordView(c, j) }),
 		Hidden: true, Width: recordingBarWidth, Height: recordingBarHeight, Frameless: true, Panel: true, AlwaysOnTop: true, SkipTaskbar: true,
 		DisableResize: true, DisableMaximize: true,
 		// Transparent window: the rounded bar paints itself, and the corners
@@ -204,16 +194,16 @@ func (a *app) record(rect image.Rectangle, options recording.Options) {
 			// Destroy bypasses the close listener that asks an active recording to stop.
 			j.window.Destroy()
 			if err != nil {
-				a.notify("录屏失败", err.Error())
+				a.notify(i18n.T("录屏失败"), err.Error())
 			} else {
-				a.notify("录屏已保存", path)
+				a.notify(i18n.T("录屏已保存"), path)
 				// The saved file's absolute path goes to the clipboard, so it can
 				// be pasted straight into a chat or a terminal.
 				if clipErr := copyTextToClipboard(path); clipErr != nil {
 					log.Print("复制录屏路径失败: ", clipErr)
 				}
 				if openErr := mygo.Shell.OpenPath(filepath.Dir(path)); openErr != nil {
-					a.notify("打开存放目录失败", fmt.Sprintf("文件已保存至 %s：%v", path, openErr))
+					a.notify(i18n.T("打开存放目录失败"), i18n.Tf("文件已保存至 %s：%v", path, openErr))
 				}
 			}
 			if a.quitting {
@@ -239,17 +229,17 @@ func (a *app) recordView(c *ui.Context, j *recordJob) {
 		Gradient(top, bottom, 180).Border(1, ui.RGBA(255, 255, 255, 0.22)).
 		InsetShadow(0, 1, 0, 0, ui.RGBA(255, 255, 255, 0.12)).DragWindow()
 	root.Children(func() {
-		label := "准备录制…"
-		status := "准备中"
+		label := i18n.T("准备录制…")
+		status := i18n.T("准备中")
 		if !j.start.IsZero() {
-			status = "录制中 · " + j.encoder.Label()
+			status = i18n.T("录制中 · ") + j.encoder.Label()
 			seconds := int(time.Since(j.start).Seconds())
 			label = fmt.Sprintf("%02d:%02d", seconds/60, seconds%60)
 			c.After(time.Second)
 		}
 		if j.stopping {
-			label = "正在保存…"
-			status = "收尾中"
+			label = i18n.T("正在保存…")
+			status = i18n.T("收尾中")
 		}
 		ui.Column(c).Grow(1).Gap(1).Children(func() {
 			ui.Row(c).Gap(7).Children(func() {
@@ -319,4 +309,53 @@ func imeIdleItem() *mygo.MenuItem {
 		}
 	}
 	return item
+}
+
+// trayMenu builds the tray menu in the current language. It is rebuilt when the
+// language changes.
+func (a *app) trayMenu() *mygo.Menu {
+	if a.startupItem == nil {
+		a.startupItem = a.autostartMenuItem()
+	}
+	return mygo.NewMenu([]*mygo.MenuItem{
+		{Label: i18n.T("截图  ·  Ctrl+I"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
+		{Label: i18n.T("开始录制  ·  Ctrl+R"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(true) }},
+		{Label: i18n.T("框选翻译  ·  Ctrl+T"), Click: func(*mygo.MenuItem, *mygo.Window) { a.beginTranslate() }},
+		{Label: i18n.T("停止录制  ·  Ctrl+Shift+T"), Click: func(*mygo.MenuItem, *mygo.Window) { a.stop() }},
+		mygo.Separator(),
+		a.startupItem,
+		saveShotItem(a),
+		imeIdleItem(),
+		{Label: i18n.T("设置 DeepSeek Key…"), Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
+		mygo.Separator(),
+		languageItem(a),
+		mygo.Separator(),
+		{Label: i18n.T("退出"), Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
+	})
+}
+
+// languageItem is the submenu for the interface language.
+func languageItem(a *app) *mygo.MenuItem {
+	var items []*mygo.MenuItem
+	for _, lang := range i18n.Languages {
+		language := lang
+		item := &mygo.MenuItem{ID: "lang-" + string(language), Label: language.Label(), Type: mygo.MenuItemRadio, Checked: i18n.Current() == language}
+		item.Click = func(*mygo.MenuItem, *mygo.Window) {
+			if err := i18n.Set(language); err != nil {
+				log.Print("保存语言设置失败: ", err)
+			}
+			a.refreshTray()
+		}
+		items = append(items, item)
+	}
+	return &mygo.MenuItem{Label: i18n.T("语言"), Submenu: items}
+}
+
+// refreshTray re-renders the tray menu after the language changed.
+func (a *app) refreshTray() {
+	if a.tray == nil {
+		return
+	}
+	a.tray.SetMenu(a.trayMenu())
+	a.tray.SetToolTip(i18n.T("ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译"))
 }

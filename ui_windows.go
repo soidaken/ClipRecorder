@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 )
@@ -163,10 +164,10 @@ func confirmButton(c *ui.Context, label string, enabled bool) ui.Element {
 // encoderBadge marks the encoder the current parameters will use, next to the
 // bitrate line: hardware in the toolbar accent, software in neutral grey.
 func encoderBadge(c *ui.Context, hardware bool, detail string) ui.Element {
-	label := "软编"
+	label := i18n.T("软编")
 	fill, edge, color := ui.RGBA(255, 255, 255, 0.06), ui.RGBA(255, 255, 255, 0.12), muted
 	if hardware {
-		label, fill, edge, color = "硬编", ui.RGBA(185, 221, 246, 0.16), ui.RGBA(185, 221, 246, 0.4), ice
+		label, fill, edge, color = i18n.T("硬编"), ui.RGBA(185, 221, 246, 0.16), ui.RGBA(185, 221, 246, 0.4), ice
 	}
 	b := ui.Row(c).Height(18).Padding(0, 7).Radius(5).Shrink(0).AlignItems(ui.Center).
 		Background(fill).Border(1, edge)
@@ -205,7 +206,7 @@ func cardButton(c *ui.Context, on bool) ui.Element {
 // paste the path instead of the picture whenever text is on the clipboard.
 func pathCheckbox(c *ui.Context, checked *bool) {
 	row := ui.CheckboxBase(c, checked).Height(32).Gap(6).Padding(0, 9).
-		Radius(8).Cursor(ui.CursorPointer).FocusRing(false).Shrink(0).Label("复制路径")
+		Radius(8).Cursor(ui.CursorPointer).FocusRing(false).Shrink(0).Label(i18n.T("复制路径"))
 	on := *checked
 	fill, edge := ui.RGBA(255, 255, 255, 0.03), ui.RGBA(255, 255, 255, 0.08)
 	if on {
@@ -231,6 +232,6 @@ func pathCheckbox(c *ui.Context, checked *bool) {
 		if on {
 			color = ice
 		}
-		ui.Text(c, "复制路径").FontSize(11.5).TextColor(color).PassThrough()
+		ui.Text(c, i18n.T("复制路径")).FontSize(11.5).TextColor(color).PassThrough()
 	})
 }

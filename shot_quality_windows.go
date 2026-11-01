@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
 	"image"
 
 	"github.com/egoist/mygo/ui"
@@ -24,11 +25,11 @@ const lowQualityLongestSide = 1280
 func (q shotQuality) label() string {
 	switch q {
 	case qualityLow:
-		return "低"
+		return i18n.T("低")
 	case qualityHigh:
-		return "高"
+		return i18n.T("高")
 	default:
-		return "中"
+		return i18n.T("中")
 	}
 }
 
@@ -56,7 +57,7 @@ func qualityControl(c *ui.Context, current *shotQuality) {
 		for _, level := range []shotQuality{qualityLow, qualityMedium, qualityHigh} {
 			active := *current == level
 			segment := ui.ButtonBase(c).Size(32, 28).Radius(6).Cursor(ui.CursorPointer).FocusRing(false).
-				Label("图片质量 " + level.label())
+				Label(i18n.T("图片质量") + " " + level.label())
 			fill, color := ui.Transparent, muted
 			if active {
 				fill, color = ice, ui.RGB(24, 35, 45)

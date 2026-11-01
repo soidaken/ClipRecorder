@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cliprecorder/internal/i18n"
 	"context"
 	"errors"
 	"fmt"
@@ -51,18 +52,18 @@ func (a *app) showKeyDialog(resume func()) {
 	}
 	d := &keyDialog{resume: resume}
 	a.keyDialog = d
-	d.window = mygo.NewWindow(mygo.WindowOptions{Title: "DeepSeek 翻译设置", Width: 460, Height: 260, Hidden: true, AlwaysOnTop: true, DisableResize: true,
+	d.window = mygo.NewWindow(mygo.WindowOptions{Title: i18n.T("DeepSeek 翻译设置"), Width: 460, Height: 260, Hidden: true, AlwaysOnTop: true, DisableResize: true,
 		Content: ui.View(func(c *ui.Context) {
 			toolTheme(c)
 			ui.Column(c).Fill().Padding(24).Gap(14).Background(ui.RGB(25, 31, 38)).Children(func() {
-				ui.Text(c, "输入 DeepSeek API Key").FontSize(18).FontWeight(600)
-				ui.Text(c, "密钥加密保存在本机。框选内容以图片发送给 DeepSeek 识别并翻译。").FontSize(12).TextColor(muted)
+				ui.Text(c, i18n.T("输入 DeepSeek API Key")).FontSize(18).FontWeight(600)
+				ui.Text(c, i18n.T("密钥加密保存在本机。框选内容以图片发送给 DeepSeek 识别并翻译。")).FontSize(12).TextColor(muted)
 				input := ui.TextInput(c, &d.key).Password().Placeholder("DeepSeek API Key").AutoFocus().Height(38).FillWidth()
 				if d.message != "" {
 					ui.Text(c, d.message).FontSize(12).TextColor(ui.RGB(255, 160, 160))
 				}
 				ui.Row(c).Gap(10).Children(func() {
-					if toolButton(c, "确认并保存", true, strings.TrimSpace(d.key) != "").Clicked() || input.Submitted() {
+					if toolButton(c, i18n.T("确认并保存"), true, strings.TrimSpace(d.key) != "").Clicked() || input.Submitted() {
 						if err := translation.SaveKey(d.key); err != nil {
 							d.message = err.Error()
 							d.window.Invalidate()
@@ -74,7 +75,7 @@ func (a *app) showKeyDialog(resume func()) {
 							d.resume()
 						}
 					}
-					if toolButton(c, "取消", false, true).Clicked() {
+					if toolButton(c, i18n.T("取消"), false, true).Clicked() {
 						d.window.Close()
 					}
 				})
@@ -142,9 +143,9 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	o := &translationOverlay{image: img, cancel: cancel, status: "正在翻译…", scale: 1, source: ui.NewBitmap(img)}
+	o := &translationOverlay{image: img, cancel: cancel, status: i18n.T("正在翻译…"), scale: 1, source: ui.NewBitmap(img)}
 	a.translation = o
-	o.window = mygo.NewWindow(mygo.WindowOptions{Title: "ClipRecorder · 翻译", Width: max(1, screenRect.Dx()), Height: max(1, screenRect.Dy()), Hidden: true, Frameless: true, Panel: true,
+	o.window = mygo.NewWindow(mygo.WindowOptions{Title: i18n.T("ClipRecorder · 翻译"), Width: max(1, screenRect.Dx()), Height: max(1, screenRect.Dy()), Hidden: true, Frameless: true, Panel: true,
 		AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableShadow: true, BackgroundColor: "#ffffff", Content: ui.View(func(c *ui.Context) { o.view(c) })})
 	disableWindowAnimation(o.window)
 	placePhysical(o.window, screenRect)
@@ -218,7 +219,7 @@ func (a *app) startTranslation(img *image.RGBA, screenRect image.Rectangle) {
 				return
 			}
 			if err != nil {
-				o.status, o.failed = "翻译未完成："+err.Error(), true
+				o.status, o.failed = i18n.T("翻译未完成：")+err.Error(), true
 				o.window.Invalidate()
 				return
 			}
@@ -305,7 +306,7 @@ func (o *translationOverlay) view(c *ui.Context) {
 		case !peek && !o.shown.IsZero() && time.Since(o.shown) < translationHint:
 			// Held back until the result is stored, so the saved copy is clean.
 			if time.Since(o.shown) > 600*time.Millisecond {
-				translationPill(c, "按住鼠标查看原文 · Esc 关闭", false, ui.End)
+				translationPill(c, i18n.T("按住鼠标查看原文 · Esc 关闭"), false, ui.End)
 			}
 			c.After(100 * time.Millisecond)
 		}
