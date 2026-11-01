@@ -232,7 +232,7 @@ func (a *app) recordView(c *ui.Context, j *recordJob) {
 		label := i18n.T("准备录制…")
 		status := i18n.T("准备中")
 		if !j.start.IsZero() {
-			status = i18n.T("录制中 · ") + j.encoder.Label()
+			status = i18n.T("录制中 · ") + i18n.T(j.encoder.Label())
 			seconds := int(time.Since(j.start).Seconds())
 			label = fmt.Sprintf("%02d:%02d", seconds/60, seconds%60)
 			c.After(time.Second)
@@ -251,7 +251,7 @@ func (a *app) recordView(c *ui.Context, j *recordJob) {
 				ui.Text(c, status).FontSize(11).TextColor(muted).Tooltip(j.encoder.Name)
 			})
 			ui.Text(c, label).Font("Segoe UI, Microsoft YaHei UI").FontSize(24).FontWeight(500).FontFeatures("tnum").TextColor(ink)
-			ui.Text(c, fmt.Sprintf("%d fps · %s · %s", j.options.FPS, j.options.Quality.Label(), j.options.AudioLabel())).FontSize(11).TextColor(muted)
+			ui.Text(c, fmt.Sprintf("%d fps · %s · %s", j.options.FPS, i18n.T(j.options.Quality.Label()), i18n.T(j.options.AudioLabel()))).FontSize(11).TextColor(muted)
 		})
 		ui.Box(c).Width(1).Height(42).Background(ui.RGBA(255, 255, 255, 0.12)).PassThrough()
 		if recordingStopButton(c, !j.stopping).Clicked() {

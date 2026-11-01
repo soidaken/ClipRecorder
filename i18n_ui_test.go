@@ -79,3 +79,21 @@ func TestTrayItemLabelsFollowLanguage(t *testing.T) {
 		t.Fatalf("english ime label: %q", got)
 	}
 }
+
+func TestRecordingPanelTranslatesRatioAndStatus(t *testing.T) {
+	previous := i18n.Current()
+	t.Cleanup(func() { i18n.Use(previous) })
+	i18n.Use(i18n.JA)
+	img := image.NewRGBA(image.Rect(0, 0, 900, 700))
+	s := &selection{record: true, desktop: img.Bounds(), snapshot: img, bitmap: ui.NewBitmap(img), scale: 1,
+		selected: true, rect: ui.Rect{X: 100, Y: 100, W: 400, H: 300}, quality: qualityMedium, hardwareChecked: true}
+	tt := ui.NewTester(s.view, 900, 700)
+	for _, text := range []string{"アスペクト比", "録画開始", "フレームレート", "画質", "エンコード"} {
+		if !tt.HasText(text) {
+			t.Fatalf("Japanese recording panel is missing %q", text)
+		}
+	}
+	if tt.HasText("比例") || tt.HasText("开始录制") {
+		t.Fatal("Chinese labels survived the Japanese switch")
+	}
+}

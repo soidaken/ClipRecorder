@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cliprecorder/internal/i18n"
 	"math"
 
 	"github.com/egoist/mygo/ui"
@@ -39,7 +40,7 @@ func (s *selection) applyAspect() {
 
 func (s *selection) aspectControl(c *ui.Context) {
 	ui.Row(c).Gap(10).Children(func() {
-		ui.Text(c, "比例").TextColor(muted).Grow(1).Tooltip("默认自由框选；再次点击已选比例可取消限制")
+		ui.Text(c, i18n.T("比例")).TextColor(muted).Grow(1).Tooltip(i18n.T("默认自由框选；再次点击已选比例可取消限制"))
 		ui.Row(c).Padding(3).Gap(3).Radius(9).Background(ui.RGBA(0, 0, 0, 0.18)).Children(func() {
 			for i, ratio := range recordingRatios {
 				b := ui.ButtonBase(c.Key(ratio.label)).Size(48, 28).Radius(6).Cursor(ui.CursorPointer)
