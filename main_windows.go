@@ -297,21 +297,20 @@ func hasArg(args []string, want string) bool {
 // saveShotItem toggles writing a file copy (and its path on the clipboard)
 // for every confirmed shot.
 func saveShotItem(a *app) *mygo.MenuItem {
-	item := &mygo.MenuItem{Label: "截图保存文件", Checked: a.shotSaveFile}
-	item.Click = func(*mygo.MenuItem, *mygo.Window) {
-		a.shotSaveFile = !a.shotSaveFile
-		item.SetChecked(a.shotSaveFile)
+	// A real checkbox item: MyGo flips Checked before calling Click, and the
+	// menu shows the new state when it opens again.
+	item := &mygo.MenuItem{ID: "save-shot", Label: "截图保存文件", Type: mygo.MenuItemCheckbox, Checked: a.shotSaveFile}
+	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
+		a.shotSaveFile = item.IsChecked()
 	}
 	return item
 }
 
 // imeIdleItem toggles switching to English after a pause in typing.
 func imeIdleItem() *mygo.MenuItem {
-	item := &mygo.MenuItem{Label: "6 秒无键盘输入后切换英文输入法", Checked: imeWatch.enabled.Load()}
-	item.Click = func(*mygo.MenuItem, *mygo.Window) {
-		enabled := !imeWatch.enabled.Load()
-		imeWatch.enabled.Store(enabled)
-		item.SetChecked(enabled)
+	item := &mygo.MenuItem{ID: "ime-idle", Label: "6 秒无键盘输入后切换英文输入法", Type: mygo.MenuItemCheckbox, Checked: imeWatch.enabled.Load()}
+	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
+		imeWatch.enabled.Store(item.IsChecked())
 		imeWatch.lastKey.Store(time.Now().UnixNano())
 		imeWatch.done.Store(false)
 	}
