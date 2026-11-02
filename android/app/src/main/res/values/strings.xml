@@ -13,4 +13,7 @@
     <string name="status_running">同步中</string>
     <string name="status_no_permission">无法写入剪贴板：请在电脑上执行 adb 授权，见应用说明</string>
     <string name="hint_permission">后台读写剪贴板需要一次性 ADB 授权：\nadb shell appops set com.cliprecorder.sync READ_CLIPBOARD allow\nadb shell appops set com.cliprecorder.sync WRITE_CLIPBOARD allow</string>
+    <string name="status_no_camera">没有相机权限，无法扫码；也可以直接粘贴配对信息</string>
+    <string name="status_scan_failed">扫码打不开：%1$s</string>
+    <string name="crash_title">上次运行崩溃了</string>
 </resources>

@@ -1,7 +1,10 @@
 package com.cliprecorder.sync
 
+import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
@@ -23,6 +26,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashLog.install(this)
 
         val density = resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
@@ -95,9 +99,46 @@ class MainActivity : Activity() {
         })
 
         setContentView(root)
+
+        CrashLog.take(this)?.let { report ->
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.crash_title))
+                .setMessage(report.take(4000))
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    CrashLog.clear(this)
+                }
+                .show()
+        }
     }
 
     private fun scanPairingCode() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_REQUEST)
+            return
+        }
+        launchScanner()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CAMERA_REQUEST) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                launchScanner()
+            } else {
+                setStatus(getString(R.string.status_no_camera))
+            }
+        }
+    }
+
+    private fun launchScanner() {
+        try {
+            startScanner()
+        } catch (error: Throwable) {
+            setStatus(getString(R.string.status_scan_failed, error.toString()))
+        }
+    }
+
+    private fun startScanner() {
         IntentIntegrator(this)
             .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
             .setPrompt(getString(R.string.scan_prompt))
@@ -116,6 +157,10 @@ class MainActivity : Activity() {
             input.setText(contents)
             startSync()
         }
+    }
+
+    companion object {
+        private const val CAMERA_REQUEST = 1001
     }
 
     private fun startSync() {
