@@ -3,6 +3,8 @@
     <string name="app_name">ClipSync</string>
     <string name="hint_pair">在电脑上右键托盘图标 →「显示配对信息…」，把那行内容粘贴到这里：</string>
     <string name="action_start">开始同步</string>
+    <string name="action_scan">扫码配对</string>
+    <string name="scan_prompt">对准电脑上的配对二维码</string>
     <string name="action_stop">停止</string>
     <string name="status_bad_pairing">配对信息格式不对，应为 IP:端口#令牌</string>
     <string name="status_started">已连接 %1$s:%2$d，保持后台运行即可同步</string>

@@ -11,10 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
+	"image/png"
+
 	"cliprecorder/internal/clipsync"
 	"cliprecorder/internal/i18n"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/skip2/go-qrcode"
 )
 
 // Clipboard sync for the local network: the PC serves its clipboard and a
@@ -35,6 +39,8 @@ type syncState struct {
 	stop    chan struct{}
 	window  *mygo.Window
 	copied  bool
+	qr      *ui.Bitmap
+	qrLine  string
 }
 
 var syncClip = &syncState{}
@@ -197,6 +203,11 @@ func (a *app) showPairingWindow() {
 				}
 				ui.Text(c, i18n.T("手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：")).FontSize(12).TextColor(muted)
 				ui.Text(c, pairingLine()).Font("Consolas").FontSize(13).TextColor(ink)
+				if bitmap := syncQRCode(); bitmap != nil {
+					ui.Row(c).Center().Children(func() {
+						ui.Image(c, bitmap).Size(180, 180)
+					})
+				}
 				ui.Text(c, i18n.T("首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。")).FontSize(11).TextColor(muted)
 				ui.Row(c).Gap(10).Children(func() {
 					label := i18n.T("复制配对信息")
@@ -260,4 +271,25 @@ func syncDebug(msg string) {
 	}
 	defer f.Close()
 	fmt.Fprintln(f, time.Now().Format("15:04:05.000"), msg)
+}
+
+// syncQRCode renders the pairing line as a QR code for the phone to scan.
+func syncQRCode() *ui.Bitmap {
+	line := pairingLine()
+	if syncClip.qr != nil && syncClip.qrLine == line {
+		return syncClip.qr
+	}
+	encoded, err := qrcode.Encode(line, qrcode.Medium, 360)
+	if err != nil {
+		log.Print("生成配对二维码失败: ", err)
+		return nil
+	}
+	img, err := png.Decode(bytes.NewReader(encoded))
+	if err != nil {
+		log.Print("解析配对二维码失败: ", err)
+		return nil
+	}
+	syncClip.qr = ui.NewBitmap(img)
+	syncClip.qrLine = line
+	return syncClip.qr
 }

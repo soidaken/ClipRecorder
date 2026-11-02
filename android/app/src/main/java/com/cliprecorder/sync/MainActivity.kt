@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.google.zxing.integration.android.IntentIntegrator
 
 /** Pairing and status screen: paste the line shown by ClipRecorder and start. */
 class MainActivity : Activity() {
@@ -59,6 +60,10 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(14), 0, dp(10))
         }
+        val scanButton = Button(this).apply {
+            text = getString(R.string.action_scan)
+            setOnClickListener { scanPairingCode() }
+        }
         startButton = Button(this).apply {
             text = getString(R.string.action_start)
             setOnClickListener { startSync() }
@@ -72,6 +77,7 @@ class MainActivity : Activity() {
         }
         buttons.addView(startButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         buttons.addView(stopButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        buttons.addView(scanButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(buttons)
 
         status = TextView(this).apply {
@@ -89,6 +95,27 @@ class MainActivity : Activity() {
         })
 
         setContentView(root)
+    }
+
+    private fun scanPairingCode() {
+        IntentIntegrator(this)
+            .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+            .setPrompt(getString(R.string.scan_prompt))
+            .setBeepEnabled(false)
+            .setOrientationLocked(false)
+            .initiateScan()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data) ?: return
+        val contents = result.contents
+        if (!contents.isNullOrEmpty()) {
+            input.setText(contents)
+            startSync()
+        }
     }
 
     private fun startSync() {

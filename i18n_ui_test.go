@@ -163,3 +163,21 @@ func TestNoHardcodedChineseLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestPairingQRCodeIsGenerated(t *testing.T) {
+	previous := syncClip.qr
+	previousLine := syncClip.qrLine
+	t.Cleanup(func() { syncClip.qr, syncClip.qrLine = previous, previousLine })
+
+	first := syncQRCode()
+	if first == nil {
+		t.Fatal("no QR code for the pairing line")
+	}
+	w, h := first.Size()
+	if w < 100 || h < 100 {
+		t.Fatalf("QR code too small: %dx%d", w, h)
+	}
+	if second := syncQRCode(); second != first {
+		t.Fatal("the QR code should be cached until the pairing line changes")
+	}
+}
