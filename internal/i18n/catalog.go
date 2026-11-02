@@ -15,6 +15,7 @@ var catalog = map[string][4]string{
 	"退出":                    {"退出", "結束", "Quit", "終了"},
 	"剪贴板同步":                 {"剪贴板同步", "剪貼簿同步", "Clipboard sync", "クリップボード同期"},
 	"显示配对信息…":               {"显示配对信息…", "顯示配對資訊…", "Show pairing info…", "ペアリング情報を表示…"},
+	"剪贴板同步已开启。":             {"剪贴板同步已开启。", "剪貼簿同步已開啟。", "Clipboard sync is on.", "クリップボード同期はオンです。"},
 	"剪贴板同步未开启，请先在托盘菜单里勾选。":                        {"剪贴板同步未开启，请先在托盘菜单里勾选。", "剪貼簿同步未開啟，請先在托盤選單裡勾選。", "Clipboard sync is off; turn it on in the tray menu first.", "クリップボード同期はオフです。トレイメニューでオンにしてください。"},
 	"手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：":      {"手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：", "手機和電腦連同一個 Wi-Fi，把下面這行貼到 ClipSync App：", "Connect the phone and the PC to the same Wi-Fi, then paste this line into the ClipSync app:", "スマートフォンと PC を同じ Wi-Fi につなぎ、次の行を ClipSync アプリに貼り付けてください:"},
 	"首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。": {"首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。", "首次連線若被 Windows 防火牆阻擋，請允許 ClipRecorder 存取網路。", "If Windows Firewall blocks the first connection, allow ClipRecorder.", "最初の接続が Windows ファイアウォールで遮断された場合は ClipRecorder を許可してください。"},

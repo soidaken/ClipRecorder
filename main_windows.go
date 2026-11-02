@@ -23,6 +23,7 @@ import (
 type app struct {
 	tray        *mygo.Tray
 	startupItem *mygo.MenuItem
+	syncItem    *mygo.MenuItem
 	selection   *selection
 	job         *recordJob
 	quitting    bool
@@ -91,6 +92,9 @@ func main() {
 		a.tray.OnRightClick(func() {
 			if enabled, autostartErr := autostart.New().Enabled(); autostartErr == nil {
 				a.startupItem.SetChecked(enabled)
+			}
+			if a.syncItem != nil {
+				a.syncItem.SetChecked(syncClip.running)
 			}
 		})
 		for _, shortcut := range []struct {
@@ -332,7 +336,7 @@ func (a *app) trayMenu() *mygo.Menu {
 		mygo.Separator(),
 		a.startupItem,
 		saveShotItem(a),
-		syncMenuItem(a),
+		a.syncItem,
 		syncPairingMenuItem(a),
 		imeIdleItem(),
 		{Label: i18n.T("设置 DeepSeek Key…"), Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},

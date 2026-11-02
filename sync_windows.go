@@ -193,19 +193,29 @@ func (a *app) showPairingWindow() {
 		return
 	}
 	syncClip.copied = false
-	window := mygo.NewWindow(mygo.WindowOptions{Title: i18n.T("剪贴板同步"), Width: 460, Height: 300, Hidden: true, AlwaysOnTop: true, DisableResize: true,
+	// Opening the window is a good moment to bring the server up again if the
+	// setting says it should run.
+	if !syncClip.running && syncEnabledAtStart() {
+		if err := startClipboardSync(); err != nil {
+			log.Print("剪贴板同步开启失败: ", err)
+		}
+	}
+	// Resizable, so a larger system font cannot hide the QR code again.
+	window := mygo.NewWindow(mygo.WindowOptions{Title: i18n.T("剪贴板同步"), Width: 500, Height: 580, MinWidth: 420, MinHeight: 480, Hidden: true, AlwaysOnTop: true,
 		Content: ui.View(func(c *ui.Context) {
 			toolTheme(c)
-			ui.Column(c).Fill().Padding(24).Gap(12).Background(ui.RGB(25, 31, 38)).Children(func() {
+			ui.Column(c).Fill().Padding(24).Gap(12).Background(ui.RGB(25, 31, 38)).DragWindow().Children(func() {
 				ui.Text(c, i18n.T("剪贴板同步")).FontSize(18).FontWeight(600)
-				if !syncClip.running {
-					ui.Text(c, i18n.T("剪贴板同步未开启，请先在托盘菜单里勾选。")).FontSize(12).TextColor(muted)
+				status := i18n.T("剪贴板同步未开启，请先在托盘菜单里勾选。")
+				if syncClip.running {
+					status = i18n.T("剪贴板同步已开启。")
 				}
+				ui.Text(c, status).FontSize(12).TextColor(muted)
 				ui.Text(c, i18n.T("手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：")).FontSize(12).TextColor(muted)
 				ui.Text(c, pairingLine()).Font("Consolas").FontSize(13).TextColor(ink)
 				if bitmap := syncQRCode(); bitmap != nil {
 					ui.Row(c).Center().Children(func() {
-						ui.Image(c, bitmap).Size(180, 180)
+						ui.Image(c, bitmap).Size(200, 200)
 					})
 				}
 				ui.Text(c, i18n.T("首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。")).FontSize(11).TextColor(muted)
@@ -236,6 +246,7 @@ func (a *app) showPairingWindow() {
 // syncMenuItem toggles the LAN clipboard sync.
 func syncMenuItem(a *app) *mygo.MenuItem {
 	item := &mygo.MenuItem{ID: "clip-sync", Label: i18n.T("剪贴板同步"), Type: mygo.MenuItemCheckbox, Checked: syncClip.running}
+	a.syncItem = item
 	item.Click = func(item *mygo.MenuItem, _ *mygo.Window) {
 		if item.IsChecked() {
 			if err := startClipboardSync(); err != nil {
