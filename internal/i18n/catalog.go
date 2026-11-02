@@ -13,7 +13,16 @@ var catalog = map[string][4]string{
 	"6 秒无键盘输入后切换英文输入法":      {"6 秒无键盘输入后切换英文输入法", "6 秒無鍵盤輸入後切換英文輸入法", "English after 6 s without typing", "6 秒入力が無ければ英語入力"},
 	"设置 DeepSeek Key…":      {"设置 DeepSeek Key…", "設定 DeepSeek Key…", "Set DeepSeek key…", "DeepSeek キーを設定…"},
 	"退出":                    {"退出", "結束", "Quit", "終了"},
-	"语言":                    {"语言", "語言", "Language", "言語"},
+	"剪贴板同步":                 {"剪贴板同步", "剪貼簿同步", "Clipboard sync", "クリップボード同期"},
+	"显示配对信息…":               {"显示配对信息…", "顯示配對資訊…", "Show pairing info…", "ペアリング情報を表示…"},
+	"剪贴板同步未开启，请先在托盘菜单里勾选。":                        {"剪贴板同步未开启，请先在托盘菜单里勾选。", "剪貼簿同步未開啟，請先在托盤選單裡勾選。", "Clipboard sync is off; turn it on in the tray menu first.", "クリップボード同期はオフです。トレイメニューでオンにしてください。"},
+	"手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：":      {"手机和电脑连同一个 Wi-Fi，把下面这行粘贴到 ClipSync App：", "手機和電腦連同一個 Wi-Fi，把下面這行貼到 ClipSync App：", "Connect the phone and the PC to the same Wi-Fi, then paste this line into the ClipSync app:", "スマートフォンと PC を同じ Wi-Fi につなぎ、次の行を ClipSync アプリに貼り付けてください:"},
+	"首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。": {"首次连接若被 Windows 防火墙拦截，请允许 ClipRecorder 访问网络。", "首次連線若被 Windows 防火牆阻擋，請允許 ClipRecorder 存取網路。", "If Windows Firewall blocks the first connection, allow ClipRecorder.", "最初の接続が Windows ファイアウォールで遮断された場合は ClipRecorder を許可してください。"},
+	"复制配对信息":    {"复制配对信息", "複製配對資訊", "Copy pairing info", "ペアリング情報をコピー"},
+	"已复制":       {"已复制", "已複製", "Copied", "コピーしました"},
+	"关闭":        {"关闭", "關閉", "Close", "閉じる"},
+	"剪贴板同步开启失败": {"剪贴板同步开启失败", "剪貼簿同步開啟失敗", "Could not start clipboard sync", "クリップボード同期を開始できません"},
+	"语言":        {"语言", "語言", "Language", "言語"},
 	"ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译": {"ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译", "ClipRecorder · Ctrl+I 截圖 / Ctrl+R 錄影 / Ctrl+T 翻譯", "ClipRecorder · Ctrl+I screenshot / Ctrl+R record / Ctrl+T translate", "ClipRecorder · Ctrl+I 撮影 / Ctrl+R 録画 / Ctrl+T 翻訳"},
 
 	// Notifications and window titles

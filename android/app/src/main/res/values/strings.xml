@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ClipSync</string>
+    <string name="hint_pair">在电脑上右键托盘图标 →「显示配对信息…」，把那行内容粘贴到这里：</string>
+    <string name="action_start">开始同步</string>
+    <string name="action_stop">停止</string>
+    <string name="status_bad_pairing">配对信息格式不对，应为 IP:端口#令牌</string>
+    <string name="status_started">已连接 %1$s:%2$d，保持后台运行即可同步</string>
+    <string name="status_stopped">已停止同步</string>
+    <string name="status_connecting">正在连接电脑…</string>
+    <string name="status_running">同步中</string>
+    <string name="status_no_permission">无法写入剪贴板：请在电脑上执行 adb 授权，见应用说明</string>
+    <string name="hint_permission">后台读写剪贴板需要一次性 ADB 授权：\nadb shell appops set com.cliprecorder.sync READ_CLIPBOARD allow\nadb shell appops set com.cliprecorder.sync WRITE_CLIPBOARD allow</string>
+</resources>

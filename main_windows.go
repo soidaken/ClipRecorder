@@ -72,6 +72,14 @@ func main() {
 		imeWatch.enabled.Store(loadIMEIdlePref())
 		imeWatch.install()
 		i18n.Load()
+		if syncEnabledAtStart() {
+			if err := startClipboardSync(); err != nil {
+				syncDebug("start error: " + err.Error())
+				log.Print("剪贴板同步开启失败: ", err)
+			}
+		} else {
+			syncDebug("disabled at start")
+		}
 		a.startupItem = a.autostartMenuItem()
 		var err error
 		a.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayPNG(), ToolTip: i18n.T("ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译"), Menu: a.trayMenu()})
@@ -324,6 +332,8 @@ func (a *app) trayMenu() *mygo.Menu {
 		mygo.Separator(),
 		a.startupItem,
 		saveShotItem(a),
+		syncMenuItem(a),
+		syncPairingMenuItem(a),
 		imeIdleItem(),
 		{Label: i18n.T("设置 DeepSeek Key…"), Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
 		mygo.Separator(),
