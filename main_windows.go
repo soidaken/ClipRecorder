@@ -43,15 +43,25 @@ type recordJob struct {
 }
 
 func main() {
+	startupLog("start, args=%q", os.Args[1:])
+	defer func() {
+		if r := recover(); r != nil {
+			startupLog("panic: %v", r)
+			panic(r)
+		}
+	}()
 	mygo.App.SetName("ClipRecorder")
 	mygo.Theme.SetSource(mygo.ThemeDark)
 	if !mygo.App.RequestSingleInstanceLock() {
+		startupLog("another instance owns the lock, exiting")
 		return
 	}
+	startupLog("lock acquired")
 	// The installer asks a running instance to quit this way: it is a tray app
 	// with no main window, so closing its windows would never end the process.
 	// Reaching this point means we own the lock, so there is nothing to quit.
 	if hasArg(os.Args[1:], "--quit") {
+		startupLog("--quit with no running instance")
 		return
 	}
 	a := &app{}
@@ -69,6 +79,7 @@ func main() {
 		}
 	})
 	mygo.App.WhenReady(func() {
+		startupLog("ready")
 		a.shotSaveFile = true
 		imeWatch.enabled.Store(loadIMEIdlePref())
 		imeWatch.install()
@@ -85,6 +96,7 @@ func main() {
 		var err error
 		a.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayPNG(), ToolTip: i18n.T("ClipRecorder · Ctrl+I 截图 / Ctrl+R 录制 / Ctrl+T 翻译"), Menu: a.trayMenu()})
 		if err != nil {
+			startupLog("tray failed: %v", err)
 			log.Print(err)
 			mygo.App.Quit()
 			return
@@ -116,9 +128,12 @@ func main() {
 			go func() { time.Sleep(2 * time.Second); mygo.App.Quit() }()
 		}
 	})
+	startupLog("entering the event loop")
 	if err := mygo.App.Run(); err != nil {
+		startupLog("event loop failed: %v", err)
 		log.Fatal(err)
 	}
+	startupLog("exiting")
 }
 
 func (a *app) notify(title, body string) {
@@ -326,8 +341,11 @@ func imeIdleItem() *mygo.MenuItem {
 // trayMenu builds the tray menu in the current language. It is rebuilt when the
 // language changes.
 func (a *app) trayMenu() *mygo.Menu {
-	// Rebuilt with the menu, so its label follows the language too.
+	// Rebuilt with the menu, so its labels follow the language too. The items
+	// are built first: the literal below would otherwise read a.syncItem before
+	// syncMenuItem had a chance to set it.
 	a.startupItem = a.autostartMenuItem()
+	syncItem := syncMenuItem(a)
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: i18n.T("截图  ·  Ctrl+I"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(false) }},
 		{Label: i18n.T("开始录制  ·  Ctrl+R"), Click: func(*mygo.MenuItem, *mygo.Window) { a.begin(true) }},
@@ -336,7 +354,7 @@ func (a *app) trayMenu() *mygo.Menu {
 		mygo.Separator(),
 		a.startupItem,
 		saveShotItem(a),
-		a.syncItem,
+		syncItem,
 		syncPairingMenuItem(a),
 		imeIdleItem(),
 		{Label: i18n.T("设置 DeepSeek Key…"), Click: func(*mygo.MenuItem, *mygo.Window) { a.showKeyDialog(nil) }},
