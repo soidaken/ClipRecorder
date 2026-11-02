@@ -33,4 +33,8 @@ android {
 
 dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // The scanner references androidx.core (ContextCompat/ActivityCompat),
+    // androidx.activity and androidx.fragment but its POM only declares the
+    // zxing core; without these the scan screen dies with NoClassDefFoundError.
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }
